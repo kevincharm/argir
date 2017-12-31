@@ -14,6 +14,5 @@ void kernel_main()
     );
     for (uint8_t i=0; i<80; i++) {
         terminal_write_char(p_term, '0'+i);
-        terminal_write_char(p_term, '\n');
     }
 }
