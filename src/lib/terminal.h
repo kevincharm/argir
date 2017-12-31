@@ -11,10 +11,11 @@ struct terminal {
     size_t width;
     size_t height;
     uint8_t colour;
-    uint16_t *buf;
+    uint16_t *buffer;
 };
 
 size_t strlen(const char *str);
+void terminal_scroll_up(struct terminal *term, size_t n);
 void terminal_clear(struct terminal *term);
 void terminal_write_char(struct terminal *term, const char str);
 void terminal_write(struct terminal *term, const char *str);

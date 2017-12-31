@@ -26,16 +26,31 @@ static inline void terminal_vga_colour_set(struct terminal *term, uint8_t fg, ui
 static inline void vga_text_set(struct terminal *term, size_t x, size_t y, unsigned char c)
 {
     size_t i = (y * term->width) + x;
-    term->buf[i] = ((uint16_t)(term->colour) << 8u) | c;
+    term->buffer[i] = ((uint16_t)(term->colour) << 8u) | c;
+}
+
+void terminal_scroll_up(struct terminal *term, size_t n)
+{
+    size_t total = term->width * term->height;
+    size_t sub = n * term->width;
+    for (size_t i=sub; i<total; i++) {
+        term->buffer[i-sub] = term->buffer[i];
+    }
+    for (size_t i=total-sub; i<total; i++) {
+        term->buffer[i] = ' ';
+    }
 }
 
 void terminal_write_char(struct terminal *term, const char c)
 {
-    if (c == '\n') {
+    switch (c) {
+    case '\n':
         term->col = 0;
         term->row += 1;
-        return;
-    } else {
+        break;
+    case '\t':
+        term->col += 4;
+    default:
         vga_text_set(term, term->col, term->row, c);
         term->col += 1;
     }
@@ -43,9 +58,10 @@ void terminal_write_char(struct terminal *term, const char c)
     if (term->col >= term->width) {
         term->col = 0;
         term->row += 1;
-        if (term->row >= term->height) {
-            term->row = 0;
-        }
+    }
+    if (term->row >= term->height) {
+        terminal_scroll_up(term, 1);
+        term->row -= 1;
     }
 }
 
@@ -72,7 +88,7 @@ void terminal_init(struct terminal *term)
     term->col = 0;
     term->width = VGA_TEXT_MODE_WIDTH;
     term->height = VGA_TEXT_MODE_HEIGHT;
-    term->buf = VGA_TEXT_MODE_ADDR;
+    term->buffer = VGA_TEXT_MODE_ADDR;
     terminal_vga_colour_set(term, VGA_COLOUR_WHITE, VGA_COLOUR_BLACK);
     terminal_clear(term);
 }
