@@ -1,3 +1,4 @@
+#include <string.h>
 #include "terminal.h"
 
 #define VGA_TEXT_MODE_ADDR      ((uint16_t *)0xb8000)
@@ -5,13 +6,6 @@
 #define VGA_TEXT_MODE_HEIGHT    (25u)
 #define VGA_COLOUR_BLACK        (0)
 #define VGA_COLOUR_WHITE        (15)
-
-size_t strlen(const char *str)
-{
-    size_t len = 0;
-    while (str[len]) len++;
-    return len;
-}
 
 static inline uint8_t vga_colour_calc(uint8_t fg, uint8_t bg)
 {

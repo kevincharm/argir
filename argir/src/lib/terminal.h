@@ -14,7 +14,6 @@ struct terminal {
     uint16_t *buffer;
 };
 
-size_t strlen(const char *str);
 void terminal_scroll_up(struct terminal *term, size_t n);
 void terminal_clear(struct terminal *term);
 void terminal_write_char(struct terminal *term, const char str);
