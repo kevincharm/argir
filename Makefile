@@ -66,4 +66,4 @@ clean:
 	rm -f *.bin
 	rm -f *.iso
 	rm -rf $(ISO_DIR)
-	rm -f $(SRC_DIR)/*.o
+	find $(SRC_DIR) -type f -name '*.o' -delete
