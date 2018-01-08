@@ -4,7 +4,7 @@ ISO_DIR=./iso
 # Compilers
 AS=i386-elf-as
 CC=i386-elf-gcc
-CFLAGS=-std=gnu11 -ffreestanding -Wall -Wextra
+CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra
 
 # Build info
 GIT_COMMIT=$(shell git log -1 --pretty=format:"%H")
@@ -16,15 +16,16 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/boot.o \
 	$(SRC_DIR)/kernel.o
 
-LIB_SRC_DIR=$(SRC_DIR)/kernel
-LIB_SRC_FILES=$(wildcard $(LIB_SRC_DIR)/*.c)
-LIB_OBJS=$(patsubst %.c,%.o,$(LIB_SRC_FILES))
-
 KLIB_DIR=$(SRC_DIR)/klib
 KLIB_INCLUDE=$(KLIB_DIR)/include
 KLIB_OBJS=\
 	$(KLIB_DIR)/stdio/putchar.o \
+	$(KLIB_DIR)/stdio/printf.o \
 	$(KLIB_DIR)/string/strlen.o
+
+LIB_DIR=$(SRC_DIR)/kernel
+LIB_OBJS=\
+	$(LIB_DIR)/terminal.o
 
 default: clean all
 
@@ -43,7 +44,8 @@ $(SRC_DIR)/boot.o: $(SRC_DIR)/boot.s
 
 $(SRC_DIR)/kernel.o: $(SRC_DIR)/kernel.c
 	$(CC) $(CFLAGS) -c $< -o $@ \
-	-I$(LIB_SRC_DIR) \
+	-I$(KLIB_INCLUDE) \
+	-I$(LIB_DIR) \
 	$(KERNEL_DEFINES)
 
 %.o: %.c
