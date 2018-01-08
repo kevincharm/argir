@@ -8,11 +8,13 @@ CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra
 
 # Build info
 GIT_COMMIT=$(shell git log -1 --pretty=format:"%H")
-KERNEL_DEFINES=-D__ARGIR_BUILD_COMMIT__=\"$(GIT_COMMIT)\"
+KERNEL_DEFINES=__ARGIR_BUILD_COMMIT__=\"$(GIT_COMMIT)\"
 
 # Sources
 SRC_DIR=./src
+KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
+	$(SRC_DIR)/kernel/terminal.o \
 	$(SRC_DIR)/boot.o \
 	$(SRC_DIR)/kernel.o
 
@@ -23,33 +25,23 @@ KLIB_OBJS=\
 	$(KLIB_DIR)/stdio/printf.o \
 	$(KLIB_DIR)/string/strlen.o
 
-LIB_DIR=$(SRC_DIR)/kernel
-LIB_OBJS=\
-	$(LIB_DIR)/terminal.o
-
 default: clean all
 
 all: argir
 
-argir: $(KLIB_OBJS) $(LIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
+argir: $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
 	$(CC) -T kernel.ld \
 	-o argir.bin -ffreestanding -nostdlib -lgcc \
 	$(KLIB_OBJS) \
-	$(LIB_OBJS) \
-	$(SRC_DIR)/kernel.o \
-	$(SRC_DIR)/boot.o
+	$(KERNEL_OBJS)
 
-$(SRC_DIR)/boot.o: $(SRC_DIR)/boot.s
+boot.o: boot.s
 	$(AS) $< -o $@
 
-$(SRC_DIR)/kernel.o: $(SRC_DIR)/kernel.c
-	$(CC) $(CFLAGS) -c $< -o $@ \
-	-I$(KLIB_INCLUDE) \
-	-I$(LIB_DIR) \
-	$(KERNEL_DEFINES)
-
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@ -I$(KLIB_INCLUDE)
+	$(CC) $(CFLAGS) -c $< -o $@ \
+	-I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) \
+	-D$(KERNEL_DEFINES)
 
 # Disk image & Qemu
 grubiso: argir

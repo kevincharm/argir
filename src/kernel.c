@@ -2,7 +2,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "terminal.h"
+#include "kernel/terminal.h"
 
 void kernel_main()
 {

@@ -1,5 +1,5 @@
 #include <string.h>
-#include "terminal.h"
+#include "kernel/terminal.h"
 
 #define VGA_TEXT_MODE_ADDR      ((uint16_t *)0xb8000)
 #define VGA_TEXT_MODE_WIDTH     (80u)
