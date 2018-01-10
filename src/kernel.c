@@ -2,7 +2,8 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include "kernel/terminal.h"
+#include <kernel/terminal.h>
+#include <kernel/keyboard.h>
 
 void kernel_main()
 {
@@ -13,5 +14,9 @@ void kernel_main()
     );
     for (uint8_t i=0; i<80; i++) {
         putchar('0'+i);
+    }
+
+    for (;;) {
+        keyboard_main();
     }
 }
