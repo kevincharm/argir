@@ -1,10 +1,7 @@
-#ifndef __ARGIR__IRQ_H
-#define __ARGIR__IRQ_H
+#ifndef __ARGIR__IO_H
+#define __ARGIR__IO_H
 
 #include <stdint.h>
-
-#define IRQ_SCAN_CODE       (0x60)
-#define IRQ_PORT_STATUS     (0x64)
 
 static inline void outb(uint16_t port, uint8_t byte)
 {
@@ -26,4 +23,4 @@ static inline uint8_t inb(uint16_t port)
     return ret;
 }
 
-#endif /* __ARGIR__IRQ_H */
+#endif /* __ARGIR__IO_H */
