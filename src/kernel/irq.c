@@ -64,6 +64,18 @@ void irq0_handler(struct interrupt_frame *frame)
     __asm__("popal; leave; iret"); // bite me
 }
 
+void set_irq_mask(uint8_t irq_num)
+{
+    uint16_t port = PIC1_PORT_DATA;
+    if (irq_num >= 8) {
+        port = PIC2_PORT_DATA;
+        irq_num -= 8;
+    }
+
+    uint8_t out = inb(port) & ~(1u << irq_num);
+    outb(port, out);
+}
+
 void irq_init()
 {
     // TODO: replace initialisation with memset
@@ -84,4 +96,7 @@ void irq_init()
 
     pic_remap();
     lidt(&idt, (sizeof (struct idt_entry) * 256) - 1);
+
+    // enable IRQ1
+    set_irq_mask(1);
 }
