@@ -45,13 +45,14 @@ static void pic_remap()
     io_wait();
 }
 
+extern void isr_wrapper(void);
+extern bool irq_test;
 extern void keyboard_irq_handler(void);
 void irq0_handler(struct interrupt_frame *frame)
 {
-    __asm__("pushal");
-
     (void)frame;
-    keyboard_irq_handler();
+    //keyboard_irq_handler();
+    irq_test = true;
 
     if (frame->int_no >= 0x28) {
         // EOI to PIC2 (slave)
@@ -60,8 +61,6 @@ void irq0_handler(struct interrupt_frame *frame)
 
     // EOI to PIC1 (master)
     outb(PIC1_PORT_CMD, 0x20);
-
-    __asm__("popal; leave; iret"); // bite me
 }
 
 void set_irq_mask(uint8_t irq_num)

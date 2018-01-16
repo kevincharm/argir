@@ -16,7 +16,7 @@ struct deque {
 static struct deque keybuf;
 static struct deque *kbuf = &keybuf;
 
-static bool test = false;
+bool irq_test = false;
 
 static inline void lifo_push(struct deque *d, char data)
 {
@@ -54,7 +54,7 @@ static void kb_scan_and_push()
 
 void keyboard_irq_handler()
 {
-    test = true;
+    irq_test = true;
     kb_scan_and_push();
 }
 
@@ -69,8 +69,8 @@ void keyboard_init()
 void keyboard_main()
 {
     // putchar(kb_scan());
-    if (test) {
-        test = false;
+    if (irq_test) {
+        irq_test = false;
         putchar('!');
     }
 

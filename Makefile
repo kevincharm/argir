@@ -15,6 +15,7 @@ SRC_DIR=./src
 KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/irq.o \
+	$(SRC_DIR)/kernel/isr.o \
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
 	$(SRC_DIR)/boot.o \
@@ -37,7 +38,7 @@ argir: $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
 	$(KLIB_OBJS) \
 	$(KERNEL_OBJS)
 
-boot.o: boot.s
+%.o: %.s
 	$(AS) $< -o $@
 
 %.o: %.c

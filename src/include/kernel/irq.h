@@ -32,7 +32,8 @@ static inline void lidt(void *base, uint16_t limit)
     struct idtr IDTR = { limit, base };
 
     __asm__ volatile (
-        "lidt %0"
+        "lidt %0\n\t"
+        "sti"
         :
         : "m"(IDTR)
     );
