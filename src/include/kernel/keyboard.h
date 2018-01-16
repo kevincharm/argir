@@ -4,6 +4,8 @@
 #define IRQ_SCAN_CODE       (0x60)
 #define IRQ_PORT_STATUS     (0x64)
 
+void keyboard_irq_handler();
+void keyboard_init();
 void keyboard_main();
 
 #endif /* __ARGIR__KEYBOARD_H */
