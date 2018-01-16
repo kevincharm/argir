@@ -29,9 +29,9 @@ static void pic_remap()
     outb(PIC2_PORT_DATA, 0x28); // PIC2 -> 40
     io_wait();
 
-    outb(PIC1_PORT_DATA, 0x04);
+    outb(PIC1_PORT_DATA, 0x00);
     io_wait();
-    outb(PIC2_PORT_DATA, 0x02);
+    outb(PIC2_PORT_DATA, 0x00);
     io_wait();
 
     outb(PIC1_PORT_DATA, 0x01);
@@ -39,7 +39,7 @@ static void pic_remap()
     outb(PIC2_PORT_DATA, 0x01);
     io_wait();
 
-    outb(PIC1_PORT_DATA, 0xff);
+    outb(PIC1_PORT_DATA, 0xfb);
     io_wait();
     outb(PIC2_PORT_DATA, 0xff);
     io_wait();
@@ -77,25 +77,14 @@ void set_irq_mask(uint8_t irq_num)
 
 void irq_init()
 {
-    // TODO: replace initialisation with memset
-    for (size_t i=0; i<256; i++) {
-        uint8_t *u8idt = (void *)(idt+i);
-        for (size_t j=0; j<3; j++)
-            u8idt[j] = 0;
-    }
-
-    /*
-        IDT entry flags
-           7    6..5         4..0
-        [  P  |  DPL  |  always 01110  ]
-     */
+    // TODO: init idt table with memset
     uint8_t sel = IDT_SEL_KERNEL;
     uint8_t flags = IDT_FLAGS_BASE | ((0x0 & 0x3) << 4u) | (1u << 7u);
-    idt_entry_set(idt+33, (uint32_t)irq0_handler, sel, flags); // IRQ1 + PIC1 offset (=32)
+    idt_entry_set(idt+33, (uint32_t)isr_wrapper, sel, flags); // IRQ1 + PIC1 offset (=32)
 
     pic_remap();
     lidt(&idt, (sizeof (struct idt_entry) * 256) - 1);
 
     // enable IRQ1
-    set_irq_mask(1);
+    // set_irq_mask(1);
 }
