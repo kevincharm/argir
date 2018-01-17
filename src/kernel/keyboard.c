@@ -38,15 +38,15 @@ static inline char lifo_pop(struct deque *d)
 {
     char ret;
     do {
-        ret = inb(IRQ_PORT_STATUS);
+        ret = inb(PS2_PORT_STATCMD);
     } while (!(ret & 1));
-    ret = (char)inb(IRQ_SCAN_CODE);
+    ret = (char)inb(PS2_PORT_DATA);
     return ret;
 }*/
 
 static void kb_scan_and_push()
 {
-    char ret = inb(IRQ_SCAN_CODE);
+    char ret = inb(PS2_PORT_DATA);
     if (ret > 0) {
         lifo_push(kbuf, ret);
     }
@@ -64,6 +64,90 @@ void keyboard_init()
     kbuf->head = 0;
     kbuf->tail = 0;
     kbuf->len = 0;
+
+    // 8042 initialisation
+    uint8_t ret;
+
+    // Disable first PS/2 port
+    outb(PS2_PORT_STATCMD, 0xad);
+
+    // Flush output buffer
+    do {
+        ret = inb(PS2_PORT_DATA);
+    } while (ret & 0x01);
+
+    // Read config
+    outb(PS2_PORT_STATCMD, 0x20);
+    ret = inb(PS2_PORT_DATA);
+    uint8_t config = ret |
+        (0u << 0u) | /* bit 0 set -> enable PS/2 #1 int */
+        (0u << 1u) |
+        (0u << 6u);
+    // Write config
+    outb(PS2_PORT_STATCMD, 0x60);
+    outb(PS2_PORT_DATA, config);
+
+    // Self-test
+    outb(PS2_PORT_STATCMD, 0xaa);
+    ret = inb(PS2_PORT_DATA);
+    if (ret != 0x55) {
+        printf("8042: self-test failed!\n");
+    }
+
+    // Test first PS/2 port
+    outb(PS2_PORT_STATCMD, 0xab);
+    ret = inb(PS2_PORT_DATA);
+    switch (ret) {
+    case 0x00:
+        break;
+    case 0x01:
+        printf("8042: PS/2 #1 clock line stuck low!\n");
+        break;
+    case 0x02:
+        printf("8042: PS/2 #1 clock line stuck high!\n");
+        break;
+    case 0x03:
+        printf("8042: PS/2 #1 data line stuck low!\n");
+        break;
+    case 0x04:
+        printf("8042: PS/2 #1 data line stuck high!\n");
+        break;
+    default:
+        printf("8042: PS/2 #1 unknown error!\n");
+    }
+
+    // Enable first PS/2 port
+    outb(PS2_PORT_STATCMD, 0xae);
+
+    // Read config
+    outb(PS2_PORT_STATCMD, 0x20);
+    ret = inb(PS2_PORT_DATA);
+    config = ret | (1u << 0u); /* bit 0 set -> enable PS/2 #1 int */
+    // Write config
+    outb(PS2_PORT_STATCMD, 0x60);
+    outb(PS2_PORT_DATA, config);
+
+    // Reset PS/2 device
+    do {
+        ret = inb(PS2_PORT_DATA);
+    } while (ret & 0x02);
+    outb(PS2_PORT_DATA, 0xff);
+    ret = inb(PS2_PORT_DATA);
+    if (ret != 0xfa) {
+        printf("PS/2 reset failed!\n");
+    }
+
+    // Enable scanning
+    do {
+        ret = inb(PS2_PORT_DATA);
+    } while (ret & 0x02);
+    outb(PS2_PORT_DATA, 0xf4);
+    ret = inb(PS2_PORT_DATA);
+    if (ret != 0xfa) {
+        printf("PS/2 enable scanning failed!\n");
+    }
+
+    printf("Keyboard initialised!\n");
 }
 
 void keyboard_main()
@@ -71,7 +155,7 @@ void keyboard_main()
     // putchar(kb_scan());
     if (irq_test) {
         irq_test = false;
-        printf('a');
+        printf("a");
     }
 
     while (kbuf->len) {
