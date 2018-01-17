@@ -40,7 +40,7 @@ static void pic_remap()
     outb(PIC2_PORT_DATA, 0x01);
     io_wait();
 
-    outb(PIC1_PORT_DATA, 0xfb);
+    outb(PIC1_PORT_DATA, 0xff);
     io_wait();
     outb(PIC2_PORT_DATA, 0xff);
     io_wait();
@@ -51,6 +51,7 @@ extern bool irq_test;
 extern void keyboard_irq_handler(void);
 void irq0_handler(struct interrupt_frame *frame)
 {
+    printf("-> irq0\n");
     (void)frame;
     // keyboard_irq_handler();
     irq_test = true;
@@ -84,10 +85,8 @@ void irq_init()
     idt_entry_set(idt+33, (uint32_t)isr_wrapper, sel, flags); // IRQ1 + PIC1 offset (=32)
 
     pic_remap();
+    outb(PIC1_PORT_DATA, 0xfb); // IRQ1
     printf("Remapped PIC.\n");
     lidt(&idt, (sizeof (struct idt_entry) * 256) - 1);
     printf("Loaded interrupt descriptor table.\n");
-
-    // enable IRQ1
-    // set_irq_mask(1);
 }
