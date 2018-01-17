@@ -1,4 +1,5 @@
 #include <stddef.h>
+#include <stdio.h>
 #include <kernel/irq.h>
 #include <kernel/io.h>
 
@@ -51,7 +52,7 @@ extern void keyboard_irq_handler(void);
 void irq0_handler(struct interrupt_frame *frame)
 {
     (void)frame;
-    //keyboard_irq_handler();
+    // keyboard_irq_handler();
     irq_test = true;
 
     if (frame->int_no >= 0x28) {
@@ -83,7 +84,9 @@ void irq_init()
     idt_entry_set(idt+33, (uint32_t)isr_wrapper, sel, flags); // IRQ1 + PIC1 offset (=32)
 
     pic_remap();
+    printf("Remapped PIC.\n");
     lidt(&idt, (sizeof (struct idt_entry) * 256) - 1);
+    printf("Loaded interrupt descriptor table.\n");
 
     // enable IRQ1
     // set_irq_mask(1);

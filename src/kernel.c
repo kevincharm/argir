@@ -8,14 +8,14 @@
 
 void kernel_main()
 {
-    irq_init();
-    keyboard_init();
     terminal_init();
     printf(
         "Argir i386\n"
         "Build "__ARGIR_BUILD_COMMIT__"\n\n"
     );
 
+    irq_init();
+    keyboard_init();
     printf("Interrupts are %s.\n",
         irqs_enabled() ? "ENABLED" : "DISABLED");
 

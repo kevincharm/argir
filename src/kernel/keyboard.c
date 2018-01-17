@@ -71,7 +71,7 @@ void keyboard_main()
     // putchar(kb_scan());
     if (irq_test) {
         irq_test = false;
-        putchar('!');
+        printf('a');
     }
 
     while (kbuf->len) {
