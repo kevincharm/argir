@@ -20,7 +20,7 @@ struct idt_entry {
     uint8_t unused; // always zero
     uint8_t flags;
     uint16_t base_hi;
-};
+}__attribute__((packed));
 
 struct idtr {
     uint16_t limit; // len of IDT in bytes - 1
