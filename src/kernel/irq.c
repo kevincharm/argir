@@ -80,13 +80,22 @@ void set_irq_mask(uint8_t irq_num)
 void irq_init()
 {
     // TODO: init idt table with memset
+    printf("---IRQ_INIT---\n");
+    cli();
+    for (size_t i=0; i<256; i++) {
+        idt_entry_set(idt+i, 0, 0, IDT_FLAGS_BASE);
+    }
+
     uint8_t sel = IDT_SEL_KERNEL;
     uint8_t flags = IDT_FLAGS_BASE | ((0x0 & 0x3) << 4u) | (1u << 7u);
     idt_entry_set(idt+33, (uint32_t)isr_wrapper, sel, flags); // IRQ1 + PIC1 offset (=32)
+    printf("idt -> isr_wrapper: %u, sel: %u, flags: %u\n",
+        (uint32_t)isr_wrapper, sel, flags);
 
     pic_remap();
-    outb(PIC1_PORT_DATA, 0xfb); // IRQ1
     printf("Remapped PIC.\n");
     lidt(&idt, (sizeof (struct idt_entry) * 256) - 1);
     printf("Loaded interrupt descriptor table.\n");
+    sti();
+    printf("Interrupts enabled.\n\n");
 }

@@ -33,10 +33,19 @@ static inline void lidt(void *base, uint16_t limit)
 
     __asm__ volatile (
         "lidt %0\n\t"
-        "sti"
         :
         : "m"(IDTR)
     );
+}
+
+static inline void sti()
+{
+    __asm__("sti");
+}
+
+static inline void cli()
+{
+    __asm__("cli");
 }
 
 static inline bool irqs_enabled()
