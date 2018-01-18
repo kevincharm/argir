@@ -24,15 +24,18 @@ struct idt_entry {
 
 struct idtr {
     uint16_t limit; // len of IDT in bytes - 1
-    void *base;
+    uint32_t base;
 }__attribute__((packed));
 
-static inline void lidt(void *base, uint16_t limit)
+static inline void lidt(uint32_t base, uint16_t limit)
 {
-    struct idtr IDTR = { limit, base };
+    struct idtr IDTR = {
+        .limit = limit,
+        .base = base
+    };
 
     __asm__ volatile (
-        "lidt %0\n\t"
+        "lidt %0"
         :
         : "m"(IDTR)
     );
