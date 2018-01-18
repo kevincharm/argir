@@ -2,6 +2,28 @@
 #include <stdio.h>
 #include <string.h>
 
+static inline int pow10(unsigned int x) {
+    unsigned int base = 10;
+    int ret = 1;
+    while (x) {
+        if (x & 0x01)
+            ret *= base;
+        base *= base;
+        x >>= 1;
+    }
+    return ret;
+}
+
+static inline int uintlen(unsigned int u) {
+    int len = 0;
+    unsigned int num = u;
+    while (num) {
+        num /= 10;
+        len += 1;
+    }
+    return len;
+}
+
 int printf(const char *restrict fmt, ...)
 {
     va_list ap;
@@ -38,6 +60,20 @@ int printf(const char *restrict fmt, ...)
             const char *str = va_arg(ap, const char *);
             for (size_t i=0; i<strlen(str); i++) {
                 putchar(*((const unsigned char *)(str+i)));
+                len += 1;
+            }
+            fmt += 1;
+            continue;
+        }
+
+        if (*fmt == 'u') {
+            unsigned int u = va_arg(ap, unsigned int);
+            int ulen = uintlen(u);
+            for (size_t i=0; i<ulen; i++) {
+                int tens = pow10(ulen-1-i);
+                int n = u/tens;
+                putchar('0'+n);
+                u -= n * tens;
                 len += 1;
             }
             fmt += 1;
