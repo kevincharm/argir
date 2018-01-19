@@ -24,13 +24,11 @@ void pic_remap()
 
 void pic_irq_off(unsigned int irq_no)
 {
-    uint16_t port;
+    uint16_t port = PIC1_PORT_DATA; // IRQ0-IRQ7
     if (irq_no <= 15) {
         if (irq_no >= 8) {
             port = PIC2_PORT_DATA; // IRQ8-IRQ15
             irq_no -= 8;
-        } else {
-            port = PIC1_PORT_DATA; // IRQ0-IRQ7
         }
         outb(port, inb(port) | (1 << irq_no));
     }
@@ -38,13 +36,11 @@ void pic_irq_off(unsigned int irq_no)
 
 void pic_irq_on(unsigned int irq_no)
 {
-    uint16_t port;
+    uint16_t port = PIC1_PORT_DATA; // IRQ0-IRQ7
     if (irq_no <= 15) {
         if (irq_no >= 8) {
-            port = PIC2_PORT_DATA; // IRQ8-IRQ1
+            port = PIC2_PORT_DATA; // IRQ8-IRQ15
             irq_no -= 8;
-        } else {
-            port = PIC1_PORT_DATA; // IRQ0-IRQ7
         }
         outb(port, inb(port) & ~(1 << irq_no));
     }
