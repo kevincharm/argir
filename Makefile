@@ -14,6 +14,9 @@ KERNEL_DEFINES=__ARGIR_BUILD_COMMIT__=\"$(GIT_COMMIT)\"
 SRC_DIR=./src
 KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
+	$(SRC_DIR)/kernel/gdt.o \
+	$(SRC_DIR)/kernel/pic.o \
+	$(SRC_DIR)/kernel/idt.o \
 	$(SRC_DIR)/kernel/irq.o \
 	$(SRC_DIR)/kernel/isr.o \
 	$(SRC_DIR)/kernel/keyboard.o \

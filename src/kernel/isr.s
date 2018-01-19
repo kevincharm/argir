@@ -4,6 +4,6 @@
 isr_wrapper:
     pushal
     cld
-    call irq0_handler
+    call irq_handler
     popal
     iret

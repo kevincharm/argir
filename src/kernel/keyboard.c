@@ -75,9 +75,6 @@ void keyboard_init()
     kbuf->tail = 0;
     kbuf->len = 0;
 
-    printf("---KEYBOARD_INIT---\n");
-    cli();
-
     // 8042 initialisation
     uint8_t ret;
 
@@ -154,8 +151,6 @@ void keyboard_init()
         printf("PS/2 reset failed!\n");
     }
 
-    sti();
-    outb(0x21, 0xfd); // temp: IRQ1 clear
     printf("Keyboard initialised!\n\n");
 }
 

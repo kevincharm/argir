@@ -2,49 +2,15 @@
 #include <stdio.h>
 #include <kernel/irq.h>
 #include <kernel/io.h>
-
-struct idt_entry idt[256];
-void idt_entry_set(struct idt_entry *entry, uint32_t base, uint8_t selector, uint8_t flags)
-{
-    entry->base_lo = (base >>  0u) & 0xffff;
-    entry->base_hi = (base >> 16u) & 0xffff;
-    entry->selector = selector;
-    entry->flags = flags;
-    entry->unused = 0;
-}
-
-#define PIC1_PORT_CMD   (0x20)
-#define PIC1_PORT_DATA  (PIC1_PORT_CMD+1)
-#define PIC2_PORT_CMD   (0xA0)
-#define PIC2_PORT_DATA  (PIC2_PORT_CMD+1)
-
-static void pic_remap()
-{
-    outb(PIC1_PORT_CMD, 0x11);
-    outb(PIC2_PORT_CMD, 0x11);
-
-    outb(PIC1_PORT_DATA, 0x20); // PIC1 -> 32
-    outb(PIC2_PORT_DATA, 0x28); // PIC2 -> 40
-
-    outb(PIC1_PORT_DATA, 0x00);
-    outb(PIC2_PORT_DATA, 0x00);
-
-    outb(PIC1_PORT_DATA, 0x01);
-    outb(PIC2_PORT_DATA, 0x01);
-
-    outb(PIC1_PORT_DATA, 0xff);
-    outb(PIC2_PORT_DATA, 0xff);
-}
+#include <kernel/cpu.h>
 
 extern void isr_wrapper(void);
-extern bool irq_test;
 extern void keyboard_irq_handler(void);
-void irq0_handler(struct interrupt_frame *frame)
+void irq_handler(struct irq_frame *frame)
 {
-    printf("-> irq0\n");
-    (void)frame;
-    // keyboard_irq_handler();
-    irq_test = true;
+    if (frame->int_no == 33) {
+        keyboard_irq_handler();
+    }
 
     if (frame->int_no >= 0x28) {
         // EOI to PIC2 (slave)
@@ -69,21 +35,10 @@ void set_irq_mask(uint8_t irq_num)
 
 void irq_init()
 {
-    // TODO: init idt table with memset
-    printf("---IRQ_INIT---\n");
-    cli();
-
     uint8_t sel = IDT_SEL_KERNEL;
     uint8_t flags = IDT_FLAGS_BASE | ((0x0 & 0x3) << 4u) | (1u << 7u);
-    idt_entry_set(idt+33, (uint32_t)isr_wrapper, sel, flags); // IRQ1 + PIC1 offset (=32)
     for (size_t i=0; i<256; i++) {
-        idt_entry_set(idt+i, (uint32_t)isr_wrapper, sel, flags);
+        idt_entry_set(i, (uint32_t)isr_wrapper, sel, flags);
     }
-
-    pic_remap();
-    printf("Remapped PIC.\n");
-    lidt((uint32_t)&idt, (sizeof(struct idt_entry) * 256) - 1);
-    printf("Loaded interrupt descriptor table.\n");
-    sti();
     printf("Interrupts enabled.\n\n");
 }
