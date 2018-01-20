@@ -89,10 +89,10 @@ void keyboard_init()
     // Read config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x20);
     ret = inb(PS2_PORT_DATA);
-    uint8_t config = ret |
-        (0u << 0u) | /* bit 0 set -> enable PS/2 #1 int */
-        (0u << 1u) |
-        (0u << 6u);
+    uint8_t config = ret;
+    config &= ~(1u << 0u); /* bit 0 set -> enable PS/2 #1 int */
+    config &= ~(1u << 1u);
+    config &= ~(1u << 6u);
     // Write config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x60);
     ps2_wait_cmd(PS2_PORT_DATA, config);
