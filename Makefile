@@ -15,6 +15,7 @@ SRC_DIR=./src
 KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/gdt.o \
+	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
 	$(SRC_DIR)/kernel/irq.o \

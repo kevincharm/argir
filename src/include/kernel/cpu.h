@@ -7,7 +7,7 @@
 /**
  *  Global Descriptor Table
  */
-#define GDT_ENTRIES_COUNT       (5)
+#define GDT_ENTRIES_COUNT       (3)
 
 struct gdt_entry {
     uint16_t limit_lo;

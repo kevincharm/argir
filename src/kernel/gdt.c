@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <kernel/cpu.h>
 
+extern void gdt_rst(void);
 static inline void lgdt(uint32_t base, uint16_t limit)
 {
     struct gdtr GDTR = {
@@ -13,6 +14,8 @@ static inline void lgdt(uint32_t base, uint16_t limit)
         :
         : "m"(GDTR)
     );
+
+    gdt_rst();
 }
 
 void gdt_entry_set(size_t index, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran)
@@ -36,8 +39,6 @@ void gdt_init()
     gdt_entry_set(0, 0, 0, 0, 0);                   // null segment
     gdt_entry_set(1, 0, 0xffffffff, 0x9a, 0xcf);    // kernel code
     gdt_entry_set(2, 0, 0xffffffff, 0x92, 0xcf);    // kernel data
-    gdt_entry_set(3, 0, 0xffffffff, 0xfa, 0xcf);    // userland code
-    gdt_entry_set(4, 0, 0xffffffff, 0xf2, 0xcf);    // userland data
 
     gdt_load();
 }
