@@ -21,7 +21,7 @@ void kernel_main()
     pic_remap();
     idt_load();
     irq_init();
-    // keyboard_init();
+    keyboard_init();
     pic_irq_on(1);
 
     sti(); // Enable interrupts
@@ -29,6 +29,6 @@ void kernel_main()
         irqs_enabled() ? "ENABLED" : "DISABLED");
 
     for (;;) {
-        keyboard_main();
+        // keyboard_main();
     }
 }

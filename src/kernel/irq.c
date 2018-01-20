@@ -8,6 +8,7 @@ extern void isr_wrapper(void);
 extern void keyboard_irq_handler(void);
 void irq_handler(struct irq_frame *frame)
 {
+    printf("a");
     if (frame->int_no == 33) {
         keyboard_irq_handler();
     }

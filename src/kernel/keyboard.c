@@ -68,11 +68,21 @@ static void ps2_wait_cmd(uint16_t port, uint8_t data)
     outb(port, data);
 }
 
-static void ps2_flush_output_buf()
+static uint8_t ps2_wait_read(uint16_t port)
+{
+    uint8_t ret;
+    do {
+        ret = inb(PS2_PORT_STATCMD);
+    } while (!(ret & 0x01));
+    return inb(port);
+}
+
+static void ps2_flush_input()
 {
     uint8_t ret;
     do {
         ret = inb(PS2_PORT_DATA);
+        ret = inb(PS2_PORT_STATCMD);
     } while (ret & 0x01);
 }
 
@@ -90,11 +100,11 @@ void keyboard_init()
     outb(PS2_PORT_STATCMD, 0xad);
 
     // Flush output buffer
-    ps2_flush_output_buf();
+    ps2_flush_input();
 
     // Read config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x20);
-    ret = inb(PS2_PORT_DATA);
+    ret = ps2_wait_read(PS2_PORT_DATA);
     uint8_t config = ret;
     config &= ~(1u << 0u); /* PS/2 IRQ1 */
     config &= ~(1u << 1u); /* PS/2 IRQ12 */
@@ -105,14 +115,14 @@ void keyboard_init()
 
     // Self-test
     ps2_wait_cmd(PS2_PORT_STATCMD, 0xaa);
-    ret = inb(PS2_PORT_DATA);
+    ret = ps2_wait_read(PS2_PORT_DATA);
     if (ret != 0x55) {
         printf("8042: self-test failed!\n");
     }
 
     // Test first PS/2 port
     ps2_wait_cmd(PS2_PORT_STATCMD, 0xab);
-    ret = inb(PS2_PORT_DATA);
+    ret = ps2_wait_read(PS2_PORT_DATA);
     switch (ret) {
     case 0x00:
         break;
@@ -137,7 +147,7 @@ void keyboard_init()
 
     // Read config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x20);
-    ret = inb(PS2_PORT_DATA);
+    ret = ps2_wait_read(PS2_PORT_DATA);
     config = ret;
     config |= (1u << 0u); /* bit 0 set -> enable PS/2 #1 int */
     config |= (1u << 4u);
@@ -145,20 +155,32 @@ void keyboard_init()
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x60);
     ps2_wait_cmd(PS2_PORT_DATA, config);
 
+    // Set autorepeat -> 500ms
+    ps2_wait_cmd(PS2_PORT_DATA, 0xf3);
+    ps2_wait_cmd(PS2_PORT_DATA, 0x20);
+
+    // Set scancode -> set 2
+    ps2_wait_cmd(PS2_PORT_DATA, 0xf0);
+    ps2_wait_cmd(PS2_PORT_DATA, 0x02);
+
+    // Flags
+    ps2_wait_cmd(PS2_PORT_DATA, 0xfa);
+
     // Enable scanning
     ps2_wait_cmd(PS2_PORT_DATA, 0xf4);
-    ret = inb(PS2_PORT_DATA);
+    ret = ps2_wait_read(PS2_PORT_DATA);
     if (ret != 0xfa) {
         printf("PS/2 enable scanning failed!\n");
     }
 
     // Reset PS/2 device
     ps2_wait_cmd(PS2_PORT_DATA, 0xff);
-    ret = inb(PS2_PORT_DATA);
+    ret = ps2_wait_read(PS2_PORT_DATA);
     if (ret != 0xfa) {
         printf("PS/2 reset failed!\n");
     }
 
+    ps2_flush_input();
     printf("Keyboard initialised!\n\n");
 }
 
