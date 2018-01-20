@@ -9,6 +9,7 @@
         cld
         call irq_handler
         popal
+        add $8, %esp    # SP+(int_no+err_code)
         iret
 .endm
 
@@ -20,6 +21,7 @@
         cld
         call irq_handler
         popal
+        add $8, %esp    # SP+(int_no+err_code)
         iret
 .endm
 
@@ -40,7 +42,7 @@ ISR_WRAPPER 4
 ISR_WRAPPER 5
 ISR_WRAPPER 6
 ISR_WRAPPER 7
-ISR_WRAPPER 8
+ISR_WRAPPER_WITH_ERR 8
 ISR_WRAPPER 9
 ISR_WRAPPER_WITH_ERR 10
 ISR_WRAPPER_WITH_ERR 11
