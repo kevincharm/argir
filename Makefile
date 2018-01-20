@@ -59,7 +59,7 @@ grubiso: argir
 	grub-mkrescue -o argir.iso iso
 
 run: grubiso
-	qemu-system-i386 -cdrom argir.iso
+	qemu-system-i386 -cdrom argir.iso -d int,cpu_reset -no-reboot
 
 .PHONY: clean
 
