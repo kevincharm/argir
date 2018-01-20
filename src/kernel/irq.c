@@ -86,8 +86,8 @@ void irq_init()
     }
     // extern void isr_systick(void);
     // idt_entry_set(32, (uint32_t)isr_systick, sel, flags); // IRQ0
-    // extern void isr33(void);
-    // idt_entry_set(33, (uint32_t)isr33, sel, flags);
+    extern void isr33(void);
+    idt_entry_set(33, (uint32_t)isr33, sel, flags);
 
     printf("Interrupts enabled.\n\n");
 }
