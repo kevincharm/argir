@@ -13,7 +13,7 @@ void pic_remap()
     outb(PIC1_PORT_DATA, 0x04);
     outb(PIC2_PORT_DATA, 0x02);
 
-    outb(PIC1_PORT_DATA, 0x01);
+    outb(PIC1_PORT_DATA, 0x05);
     outb(PIC2_PORT_DATA, 0x01);
 
     outb(PIC1_PORT_DATA, 0xff);

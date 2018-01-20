@@ -68,6 +68,14 @@ static void ps2_wait_cmd(uint16_t port, uint8_t data)
     outb(port, data);
 }
 
+static void ps2_flush_output_buf()
+{
+    uint8_t ret;
+    do {
+        ret = inb(PS2_PORT_DATA);
+    } while (ret & 0x01);
+}
+
 void keyboard_init()
 {
     // TODO: memset yadda yadda
@@ -82,17 +90,15 @@ void keyboard_init()
     outb(PS2_PORT_STATCMD, 0xad);
 
     // Flush output buffer
-    do {
-        ret = inb(PS2_PORT_DATA);
-    } while (ret & 0x01);
+    ps2_flush_output_buf();
 
     // Read config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x20);
     ret = inb(PS2_PORT_DATA);
     uint8_t config = ret;
-    config &= ~(1u << 0u); /* bit 0 set -> enable PS/2 #1 int */
-    config &= ~(1u << 1u);
-    config &= ~(1u << 6u);
+    config &= ~(1u << 0u); /* PS/2 IRQ1 */
+    config &= ~(1u << 1u); /* PS/2 IRQ12 */
+    config &= ~(1u << 6u); /* Translation */
     // Write config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x60);
     ps2_wait_cmd(PS2_PORT_DATA, config);
@@ -132,7 +138,9 @@ void keyboard_init()
     // Read config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x20);
     ret = inb(PS2_PORT_DATA);
-    config = ret | (1u << 0u); /* bit 0 set -> enable PS/2 #1 int */
+    config = ret;
+    config |= (1u << 0u); /* bit 0 set -> enable PS/2 #1 int */
+    config |= (1u << 4u);
     // Write config
     ps2_wait_cmd(PS2_PORT_STATCMD, 0x60);
     ps2_wait_cmd(PS2_PORT_DATA, config);
