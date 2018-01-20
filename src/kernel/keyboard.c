@@ -57,7 +57,7 @@ void keyboard_irq_handler()
 {
     irq_test = true;
     printf("Keyboard IRQ handler called!\n");
-    // kb_scan_and_push();
+    kb_scan_and_push();
 }
 
 static void ps2_wait_write(uint16_t port, uint8_t data)
@@ -195,13 +195,12 @@ void keyboard_init()
 
 void keyboard_main()
 {
-    // putchar(kb_scan());
     if (irq_test) {
         irq_test = false;
         printf("a");
     }
 
-    // while (kbuf->len) {
-        // putchar(lifo_pop(kbuf));
-    // }
+    while (kbuf->len) {
+        putchar(lifo_pop(kbuf));
+    }
 }
