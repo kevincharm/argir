@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdbool.h>
+#include <memory.h>
 #include <kernel/io.h>
 #include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
@@ -16,8 +17,6 @@ struct deque {
 
 static struct deque keybuf;
 static struct deque *kbuf = &keybuf;
-
-bool irq_test = false;
 
 static inline void lifo_push(struct deque *d, char data)
 {
@@ -35,29 +34,42 @@ static inline char lifo_pop(struct deque *d)
     return ret;
 }
 
-/*static char kb_scan()
+static inline void lifo_init(struct deque *d)
 {
-    char ret;
-    do {
-        ret = inb(PS2_PORT_STATCMD);
-    } while (!(ret & 1));
-    ret = (char)inb(PS2_PORT_DATA);
-    return ret;
-}*/
+    memset(d->buffer, 0, DEQUE_BUFSIZ);
+    d->head = 0;
+    d->tail = 0;
+    d->len = 0;
+}
 
-static void kb_scan_and_push()
+#define KB_SCAN_BUFSIZ (8)
+static void kb_scan()
 {
-    char ret = inb(PS2_PORT_DATA);
-    if (ret > 0) {
-        lifo_push(kbuf, ret);
+    size_t len = 0;
+    uint8_t buf[KB_SCAN_BUFSIZ];
+    memset(buf, 0, KB_SCAN_BUFSIZ);
+    do {
+        buf[len++] = inb(PS2_PORT_DATA);
+    } while (
+        (inb(PS2_PORT_STATCMD) & 0x01) &&
+        (len < KB_SCAN_BUFSIZ)
+    );
+
+    char out = 0;
+    switch (*buf) {
+    case 0x1c:
+        out = 'a';
+        break;
+    }
+
+    if (out) {
+        lifo_push(kbuf, out);
     }
 }
 
 void keyboard_irq_handler()
 {
-    irq_test = true;
-    printf("Keyboard IRQ handler called!\n");
-    kb_scan_and_push();
+    kb_scan();
 }
 
 static void ps2_wait_write(uint16_t port, uint8_t data)
@@ -89,10 +101,7 @@ static void ps2_flush_output()
 
 void keyboard_init()
 {
-    // TODO: memset yadda yadda
-    kbuf->head = 0;
-    kbuf->tail = 0;
-    kbuf->len = 0;
+    lifo_init(kbuf);
 
     // 8042 initialisation
     uint8_t ret;
@@ -195,11 +204,6 @@ void keyboard_init()
 
 void keyboard_main()
 {
-    if (irq_test) {
-        irq_test = false;
-        printf("a");
-    }
-
     while (kbuf->len) {
         putchar(lifo_pop(kbuf));
     }

@@ -11,8 +11,6 @@
 extern void keyboard_irq_handler(void);
 void isr_handler(struct irq_frame frame)
 {
-    printf("%u\n", frame.int_no);
-
     if (frame.int_no == 33) {
         keyboard_irq_handler();
     }

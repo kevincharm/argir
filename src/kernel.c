@@ -29,6 +29,6 @@ void kernel_main()
         irqs_enabled() ? "ENABLED" : "DISABLED");
 
     for (;;) {
-        // keyboard_main();
+        keyboard_main();
     }
 }
