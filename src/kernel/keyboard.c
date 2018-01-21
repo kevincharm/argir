@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <memory.h>
+#include <queue.h>
 #include <kernel/io.h>
 #include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
@@ -94,42 +95,8 @@ static uint8_t kb_ps2_scancode2_shift[] = {
     KB_NUL, KB_NUL, KB_BACKSPACE
 };
 
-/* DEQUE */
-#define DEQUE_BUFSIZ   (512)
-
-struct deque {
-    char buffer[DEQUE_BUFSIZ];
-    size_t head;
-    size_t tail;
-    size_t len;
-};
-
-static struct deque keybuf;
-static struct deque *kbuf = &keybuf;
-
-static inline void lifo_push(struct deque *d, char data)
-{
-    *(d->buffer + d->head) = data;
-    d->head = (d->head + 1) % DEQUE_BUFSIZ;
-    d->len += 1;
-}
-
-static inline char lifo_pop(struct deque *d)
-{
-    // Needs to be atomic wrt IRQs
-    char ret = *(d->buffer + d->tail);
-    d->tail = (d->tail + 1) % DEQUE_BUFSIZ;
-    d->len -= 1;
-    return ret;
-}
-
-static inline void lifo_init(struct deque *d)
-{
-    memset(d->buffer, 0, DEQUE_BUFSIZ);
-    d->head = 0;
-    d->tail = 0;
-    d->len = 0;
-}
+static struct u8_deque keybuf;
+static struct u8_deque *kbuf = &keybuf;
 
 static volatile bool break_next = false;
 static volatile bool shift_next = false;
@@ -182,7 +149,7 @@ static void kb_scan()
             key -= 0x20;
         }
         if (!break_next) {
-            lifo_push(kbuf, key);
+            u8_lifo_push(kbuf, key);
         }
         goto input_finished;
     }
@@ -229,7 +196,7 @@ static void ps2_flush_output()
 
 void keyboard_init()
 {
-    lifo_init(kbuf);
+    u8_lifo_init(kbuf);
 
     // 8042 initialisation
     uint8_t ret;
@@ -333,6 +300,6 @@ void keyboard_init()
 void keyboard_main()
 {
     while (kbuf->len) {
-        putchar(lifo_pop(kbuf));
+        putchar(u8_lifo_pop(kbuf));
     }
 }
