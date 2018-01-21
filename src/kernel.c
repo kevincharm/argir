@@ -3,7 +3,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <kernel/cpu.h>
-#include <kernel/irq.h>
+#include <kernel/interrupts.h>
 #include <kernel/terminal.h>
 #include <kernel/keyboard.h>
 

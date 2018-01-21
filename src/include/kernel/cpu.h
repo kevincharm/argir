@@ -35,6 +35,8 @@ void gdt_init();
 #define IDT_ENTRIES_COUNT       (256)
 #define IDT_SEL_KERNEL          (0x8)
 #define IDT_FLAGS_BASE          (0xe)
+#define IDT_ENTRY_DEFAULT_SEL   (IDT_SEL_KERNEL)
+#define IDT_ENTRY_DEFAULT_FLAG  (IDT_FLAGS_BASE | ((0x0 & 0x3) << 4u) | (1u << 7u))
 
 struct idt_entry {
     uint16_t base_lo;

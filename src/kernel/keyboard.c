@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <kernel/io.h>
-#include <kernel/irq.h>
+#include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
 
 #define DEQUE_BUFSIZ   (512)

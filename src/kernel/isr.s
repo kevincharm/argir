@@ -1,25 +1,25 @@
 .align 4
 
-.macro ISR_WRAPPER irqno
-    .global isr\irqno
-    isr\irqno:
+.macro ISR_WRAPPER int_no
+    .global isr\int_no
+    isr\int_no:
         pushl $0        # err_code
-        pushl $\irqno   # int_no
+        pushl $\int_no   # int_no
         pushal
         cld
-        call irq_handler
+        call isr_handler
         popal
         add $8, %esp    # SP+(int_no+err_code)
         iret
 .endm
 
-.macro ISR_WRAPPER_WITH_ERR irqno
-    .global isr\irqno
-    isr\irqno:
-        pushl $\irqno   # int_no
+.macro ISR_WRAPPER_WITH_ERR int_no
+    .global isr\int_no
+    isr\int_no:
+        pushl $\int_no   # int_no
         pushal
         cld
-        call irq_handler
+        call isr_handler
         popal
         add $8, %esp    # SP+(int_no+err_code)
         iret
@@ -31,7 +31,7 @@ isr_systick:
 
 .global isr_stub
 isr_stub:
-    call irq_stub_handler
+    call isr_stub_handler
     iret
 
 ISR_WRAPPER 0

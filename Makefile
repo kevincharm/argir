@@ -18,7 +18,7 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
-	$(SRC_DIR)/kernel/irq.o \
+	$(SRC_DIR)/kernel/interrupts.o \
 	$(SRC_DIR)/kernel/isr.o \
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
