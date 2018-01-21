@@ -6,6 +6,95 @@
 #include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
 
+#define KB_SCAN2_NUMPAD         (0xe0)
+#define KB_SCAN2_BREAK          (0xf0) /* TODO: Put in keycode map */
+
+#define KB_NUL                  (0)
+#define KB_FKEYS                (0x80)
+#define KB_F1                   (KB_FKEYS+1)
+#define KB_F2                   (KB_FKEYS+2)
+#define KB_F3                   (KB_FKEYS+3)
+#define KB_F4                   (KB_FKEYS+4)
+#define KB_F5                   (KB_FKEYS+5)
+#define KB_F6                   (KB_FKEYS+6)
+#define KB_F7                   (KB_FKEYS+7)
+#define KB_F8                   (KB_FKEYS+8)
+#define KB_F9                   (KB_FKEYS+9)
+#define KB_F10                  (KB_FKEYS+10)
+#define KB_F11                  (KB_FKEYS+11)
+#define KB_F12                  (KB_FKEYS+12)
+#define KB_MODKEYS              (0x90)
+#define KB_TAB                  (KB_MODKEYS+0)
+#define KB_BACKTICK             (KB_MODKEYS+1)
+#define KB_LALT                 (KB_MODKEYS+2)
+#define KB_RALT                 (KB_MODKEYS+3)
+#define KB_LSHIFT               (KB_MODKEYS+4)
+#define KB_RSHIFT               (KB_MODKEYS+5)
+#define KB_LCTRL                (KB_MODKEYS+6)
+#define KB_RCTRL                (KB_MODKEYS+7)
+#define KB_CAPSLOCK             (KB_MODKEYS+8)
+#define KB_ENTER                (0xd)
+#define KB_BACKSPACE            (0x8)
+
+static uint8_t kb_ps2_scancode2[] = {
+    KB_NUL, KB_F9, KB_NUL, KB_F5,
+    KB_F3, KB_F1, KB_F2, KB_F12,
+    KB_NUL, KB_F10, KB_F8, KB_F6,
+    KB_F4, '\t', '`', KB_NUL,
+    KB_NUL, KB_LALT, KB_LSHIFT, KB_NUL,
+    KB_LCTRL, 'q', '1', KB_NUL,
+    KB_NUL, KB_NUL, 'z', 's',
+    'a', 'w', '2', KB_NUL,
+    KB_NUL, 'c', 'x', 'd',
+    'e', '4', '3', KB_NUL,
+    KB_NUL, ' ', 'v', 'f',
+    't', 'r', '5', KB_NUL,
+    KB_NUL, 'n', 'b', 'h',
+    'g', 'y', '6', KB_NUL,
+    KB_NUL, KB_NUL, 'm', 'j',
+    'u', '7', '8', KB_NUL,
+    KB_NUL, ',', 'k', 'i',
+    'o', '0', '9', KB_NUL,
+    KB_NUL, '.', '/', 'l',
+    ';', 'p', '-', KB_NUL,
+    KB_NUL, KB_NUL, '\'', KB_NUL,
+    '[', '=', KB_NUL, KB_NUL,
+    KB_CAPSLOCK, KB_RSHIFT, KB_ENTER,']',
+    KB_NUL, '\\', KB_NUL, KB_NUL,
+    KB_NUL, KB_NUL, KB_NUL, KB_NUL,
+    KB_NUL, KB_NUL, KB_BACKSPACE
+};
+
+static uint8_t kb_ps2_scancode2_shift[] = {
+    KB_NUL, KB_F9, KB_NUL, KB_F5,
+    KB_F3, KB_F1, KB_F2, KB_F12,
+    KB_NUL, KB_F10, KB_F8, KB_F6,
+    KB_F4, '\t', '~', KB_NUL,
+    KB_NUL, KB_LALT, KB_LSHIFT, KB_NUL,
+    KB_LCTRL, 'Q', '!', KB_NUL,
+    KB_NUL, KB_NUL, 'Z', 'S',
+    'A', 'W', '@', KB_NUL,
+    KB_NUL, 'C', 'X', 'D',
+    'E', '$', '#', KB_NUL,
+    KB_NUL, ' ', 'V', 'F',
+    'T', 'R', '%', KB_NUL,
+    KB_NUL, 'N', 'B', 'H',
+    'G', 'Y', '^', KB_NUL,
+    KB_NUL, KB_NUL, 'M', 'J',
+    'U', '&', '*', KB_NUL,
+    KB_NUL, '<', 'K', 'I',
+    'O', ')', '(', KB_NUL,
+    KB_NUL, '>', '?', 'L',
+    ':', 'P', '_', KB_NUL,
+    KB_NUL, KB_NUL, '"', KB_NUL,
+    '{', '+', KB_NUL, KB_NUL,
+    KB_CAPSLOCK, KB_RSHIFT, KB_ENTER,'}',
+    KB_NUL, '|', KB_NUL, KB_NUL,
+    KB_NUL, KB_NUL, KB_NUL, KB_NUL,
+    KB_NUL, KB_NUL, KB_BACKSPACE
+};
+
+/* DEQUE */
 #define DEQUE_BUFSIZ   (512)
 
 struct deque {
@@ -42,29 +131,68 @@ static inline void lifo_init(struct deque *d)
     d->len = 0;
 }
 
-#define KB_SCAN_BUFSIZ (8)
+static volatile bool break_next = false;
+static volatile bool shift_next = false;
+static volatile bool caps_lock = false;
+
 static void kb_scan()
 {
-    size_t len = 0;
-    uint8_t buf[KB_SCAN_BUFSIZ];
-    memset(buf, 0, KB_SCAN_BUFSIZ);
-    do {
-        buf[len++] = inb(PS2_PORT_DATA);
-    } while (
-        (inb(PS2_PORT_STATCMD) & 0x01) &&
-        (len < KB_SCAN_BUFSIZ)
-    );
+    uint8_t raw = inb(PS2_PORT_DATA);
 
-    char out = 0;
-    switch (*buf) {
-    case 0x1c:
-        out = 'a';
-        break;
+    if (raw == KB_SCAN2_BREAK) {
+        break_next = true;
+        goto done;
     }
 
-    if (out) {
-        lifo_push(kbuf, out);
+    // Check OOB
+    if (raw > sizeof(kb_ps2_scancode2) ||
+        raw > sizeof(kb_ps2_scancode2_shift))
+        goto done;
+
+    uint8_t key;
+    if (shift_next) {
+        key = kb_ps2_scancode2_shift[raw];
+    } else {
+        key = kb_ps2_scancode2[raw];
     }
+
+    if (key == KB_LSHIFT || key == KB_RSHIFT) {
+        if (!break_next) {
+            shift_next = true;
+        } else {
+            shift_next = false;
+        }
+        goto input_finished;
+    }
+
+    if (key == KB_CAPSLOCK) {
+        if (break_next) {
+            caps_lock = !caps_lock;
+        }
+        goto input_finished;
+    }
+
+    if ((key >= 0x20 && key <= 0x7f) ||
+        key == KB_BACKSPACE ||
+        key == KB_ENTER) {
+        // Printable ASCII
+        if (caps_lock &&
+            key >= 0x61 && key <= 0x7a) {
+            // Transform lowercase->uppercase
+            key -= 0x20;
+        }
+        if (!break_next) {
+            lifo_push(kbuf, key);
+        }
+        goto input_finished;
+    }
+
+input_finished:
+    if (break_next)
+        break_next = false;
+
+done:
+    return;
 }
 
 void keyboard_irq_handler()
@@ -94,7 +222,7 @@ static void ps2_flush_output()
 {
     uint8_t ret;
     do {
-        ret = inb(PS2_PORT_DATA);
+        inb(PS2_PORT_DATA);
         ret = inb(PS2_PORT_STATCMD);
     } while (ret & 0x01);
 }
