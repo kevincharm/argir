@@ -3,25 +3,25 @@
 .macro ISR_WRAPPER int_no
     .global isr\int_no
     isr\int_no:
-        pushl $0        # err_code
-        pushl $\int_no   # int_no
+        pushl $0            # err_code
+        pushl $\int_no      # int_no
         pushal
         cld
         call isr_handler
         popal
-        add $8, %esp    # SP+(int_no+err_code)
+        add $8, %esp        # SP+(int_no+err_code)
         iret
 .endm
 
 .macro ISR_WRAPPER_WITH_ERR int_no
     .global isr\int_no
     isr\int_no:
-        pushl $\int_no   # int_no
+        pushl $\int_no      # int_no
         pushal
         cld
         call isr_handler
         popal
-        add $8, %esp    # SP+(int_no+err_code)
+        add $8, %esp        # SP+(int_no+err_code)
         iret
 .endm
 
@@ -66,4 +66,4 @@ ISR_WRAPPER 28
 ISR_WRAPPER 29
 ISR_WRAPPER 30
 ISR_WRAPPER 31
-ISR_WRAPPER 33 # IRQ1
+ISR_WRAPPER 33              # IRQ1
