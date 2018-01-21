@@ -28,6 +28,7 @@ KERNEL_OBJS=\
 KLIB_DIR=$(SRC_DIR)/klib
 KLIB_INCLUDE=$(KLIB_DIR)/include
 KLIB_OBJS=\
+	$(KLIB_DIR)/memory/memset.o \
 	$(KLIB_DIR)/stdio/putchar.o \
 	$(KLIB_DIR)/stdio/printf.o \
 	$(KLIB_DIR)/string/strlen.o
