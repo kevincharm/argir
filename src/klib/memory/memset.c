@@ -8,4 +8,5 @@ void *memset(void *s, int c, size_t n)
     for (size_t i=0; i<n; i++) {
         *(mem+i) = (uint8_t)c;
     }
+    return s;
 }
