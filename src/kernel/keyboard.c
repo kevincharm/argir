@@ -7,11 +7,11 @@
 #include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
 
-#define KB_SCAN2_NUMPAD         (0xe0)
 #define KB_SCAN2_BREAK          (0xf0) /* TODO: Put in keycode map */
 
 #define KB_NUL                  (0)
 #define KB_FKEYS                (0x100)
+#define KB_ESCAPE               (KB_FKEYS+0)
 #define KB_F1                   (KB_FKEYS+1)
 #define KB_F2                   (KB_FKEYS+2)
 #define KB_F3                   (KB_FKEYS+3)
@@ -32,6 +32,8 @@
 #define KB_LCTRL                (KB_MODKEYS+4)
 #define KB_RCTRL                (KB_MODKEYS+5)
 #define KB_CAPSLOCK             (KB_MODKEYS+6)
+#define KB_NUMLOCK              (KB_MODKEYS+7)
+#define KB_SCRLOCK              (KB_MODKEYS+8)
 #define KB_ENTER                (0xd)
 #define KB_BACKSPACE            (0x8)
 
@@ -58,10 +60,17 @@ static uint32_t kb_ps2_scancode2[] = {
     ';', 'p', '-', KB_NUL,
     KB_NUL, KB_NUL, '\'', KB_NUL,
     '[', '=', KB_NUL, KB_NUL,
-    KB_CAPSLOCK, KB_RSHIFT, KB_ENTER,']',
+    KB_CAPSLOCK, KB_RSHIFT, KB_ENTER, ']',
     KB_NUL, '\\', KB_NUL, KB_NUL,
     KB_NUL, KB_NUL, KB_NUL, KB_NUL,
-    KB_NUL, KB_NUL, KB_BACKSPACE
+    KB_NUL, KB_NUL, KB_BACKSPACE, KB_NUL,
+    KB_NUL, '1', KB_NUL, '4', /* This line and below are numpad */
+    '7', KB_NUL, KB_NUL, KB_NUL,
+    '0', '.', '2', '5',
+    '6', '8', KB_ESCAPE, KB_NUMLOCK,
+    KB_F11, '+', '3', '-',
+    '*', '9', KB_SCRLOCK, KB_NUL,
+    KB_NUL, KB_NUL, KB_NUL, KB_F7
 };
 
 static uint32_t kb_ps2_scancode2_shift[] = {
@@ -90,7 +99,14 @@ static uint32_t kb_ps2_scancode2_shift[] = {
     KB_CAPSLOCK, KB_RSHIFT, KB_ENTER,'}',
     KB_NUL, '|', KB_NUL, KB_NUL,
     KB_NUL, KB_NUL, KB_NUL, KB_NUL,
-    KB_NUL, KB_NUL, KB_BACKSPACE
+    KB_NUL, KB_NUL, KB_BACKSPACE, KB_NUL,
+    KB_NUL, '1', KB_NUL, '4', /* This line and below are numpad */
+    '7', KB_NUL, KB_NUL, KB_NUL,
+    '0', '.', '2', '5',
+    '6', '8', KB_ESCAPE, KB_NUMLOCK,
+    KB_F11, '+', '3', '-',
+    '*', '9', KB_SCRLOCK, KB_NUL,
+    KB_NUL, KB_NUL, KB_NUL, KB_F7
 };
 
 static struct u8_deque keybuf;
