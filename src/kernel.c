@@ -15,18 +15,15 @@ void kernel_main()
         "Build "__ARGIR_BUILD_COMMIT__"\n\n"
     );
 
-    cli(); // Disable interrupts
+    interrupts_disable();
 
     gdt_init();
     pic_remap();
     idt_load();
-    irq_init();
+    interrupts_init();
     keyboard_init();
-    pic_irq_on(1);
 
-    sti(); // Enable interrupts
-    printf("Interrupts are %s.\n",
-        irqs_enabled() ? "ENABLED" : "DISABLED");
+    interrupts_enable();
 
     for (;;) {
         keyboard_main();

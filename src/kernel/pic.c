@@ -18,8 +18,6 @@ void pic_remap()
 
     outb(PIC1_PORT_DATA, 0xff);
     outb(PIC2_PORT_DATA, 0xff);
-
-    printf("Remapped PIC.\n");
 }
 
 void pic_irq_off(unsigned int irq_no)

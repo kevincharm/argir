@@ -9,7 +9,7 @@
     idt_entry_set(n, (uint32_t)isr##n, IDT_ENTRY_DEFAULT_SEL, IDT_ENTRY_DEFAULT_FLAG);
 
 extern void keyboard_irq_handler(void);
-void isr_handler(struct irq_frame frame)
+void isr_handler(struct interrupt_frame frame)
 {
     if (frame.int_no == 33) {
         keyboard_irq_handler();
@@ -24,14 +24,14 @@ void isr_handler(struct irq_frame frame)
     outb(PIC1_PORT_CMD, 0x20);
 }
 
-void isr_stub_handler(struct irq_frame frame)
+void isr_stub_handler(struct interrupt_frame frame)
 {
     (void)frame;
     printf("IRQ stub handler called!\n");
 }
 
 extern void isr_stub(void);
-void irq_init()
+void interrupts_init()
 {
     IDT_DEFAULT_ISR_HANDLER(0);
     IDT_DEFAULT_ISR_HANDLER(1);
@@ -72,6 +72,4 @@ void irq_init()
     }
 
     IDT_DEFAULT_ISR_HANDLER(33); // IRQ1 (PS/2)
-
-    printf("Interrupts enabled.\n\n");
 }

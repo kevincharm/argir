@@ -210,12 +210,7 @@ void keyboard_init()
 
     // Read config
     ps2_wait_write(PS2_PORT_STATCMD, 0x20);
-    ret = ps2_wait_read(PS2_PORT_DATA);
-    if (!((ret >> 2u) & 0x01)) {
-        printf("8042: Config = %u\n", ret);
-        printf("8042: System did not pass POST!\n");
-    }
-    uint8_t config = ret;
+    uint8_t config = ps2_wait_read(PS2_PORT_DATA);
     config &= ~(1u << 0u); /* PS/2 IRQ1 */
     config &= ~(1u << 1u); /* PS/2 IRQ12 */
     config &= ~(1u << 6u); /* Translation */
@@ -266,7 +261,6 @@ void keyboard_init()
     // Write config
     ps2_wait_write(PS2_PORT_STATCMD, 0x60);
     ps2_wait_write(PS2_PORT_DATA, config);
-    printf("8042: Wrote PS/2 config = %u\n", config);
 
     // Set autorepeat -> 500ms
     ps2_wait_write(PS2_PORT_DATA, 0xf3);
@@ -294,7 +288,9 @@ void keyboard_init()
     }
 
     ps2_flush_output();
-    printf("Keyboard initialised!\n\n");
+    pic_irq_on(1);
+
+    printf("Initialised keyboard.\n");
 }
 
 void keyboard_main()

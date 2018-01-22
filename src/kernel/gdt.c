@@ -41,4 +41,5 @@ void gdt_init()
     gdt_entry_set(2, 0, 0xffffffff, 0x92, 0xcf);    // kernel data
 
     gdt_load();
+    printf("Loaded global descriptor table.\n");
 }
