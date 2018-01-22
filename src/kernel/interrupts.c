@@ -8,7 +8,9 @@
     extern void isr##n(void); \
     idt_entry_set(n, (uint32_t)isr##n, IDT_ENTRY_DEFAULT_SEL, IDT_ENTRY_DEFAULT_FLAG);
 
+extern void isr_stub(void);
 extern void keyboard_irq_handler(void);
+
 void isr_handler(struct interrupt_frame frame)
 {
     if (frame.int_no == 33) {
@@ -30,7 +32,6 @@ void isr_stub_handler(struct interrupt_frame frame)
     printf("IRQ stub handler called!\n");
 }
 
-extern void isr_stub(void);
 void interrupts_init()
 {
     IDT_DEFAULT_ISR_HANDLER(0);

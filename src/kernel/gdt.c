@@ -2,6 +2,7 @@
 #include <kernel/cpu.h>
 
 extern void gdt_rst(void);
+
 static inline void lgdt(uint32_t base, uint16_t limit)
 {
     struct gdtr GDTR = {
