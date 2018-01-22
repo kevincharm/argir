@@ -30,18 +30,6 @@ void isr_stub_handler(struct irq_frame frame)
     printf("IRQ stub handler called!\n");
 }
 
-void set_irq_mask(uint8_t irq_num)
-{
-    uint16_t port = PIC1_PORT_DATA;
-    if (irq_num >= 8) {
-        port = PIC2_PORT_DATA;
-        irq_num -= 8;
-    }
-
-    uint8_t out = inb(port) & ~(1u << irq_num);
-    outb(port, out);
-}
-
 extern void isr_stub(void);
 void irq_init()
 {
