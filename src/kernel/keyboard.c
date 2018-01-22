@@ -11,7 +11,7 @@
 #define KB_SCAN2_BREAK          (0xf0) /* TODO: Put in keycode map */
 
 #define KB_NUL                  (0)
-#define KB_FKEYS                (0x80)
+#define KB_FKEYS                (0x100)
 #define KB_F1                   (KB_FKEYS+1)
 #define KB_F2                   (KB_FKEYS+2)
 #define KB_F3                   (KB_FKEYS+3)
@@ -24,20 +24,18 @@
 #define KB_F10                  (KB_FKEYS+10)
 #define KB_F11                  (KB_FKEYS+11)
 #define KB_F12                  (KB_FKEYS+12)
-#define KB_MODKEYS              (0x90)
-#define KB_TAB                  (KB_MODKEYS+0)
-#define KB_BACKTICK             (KB_MODKEYS+1)
-#define KB_LALT                 (KB_MODKEYS+2)
-#define KB_RALT                 (KB_MODKEYS+3)
-#define KB_LSHIFT               (KB_MODKEYS+4)
-#define KB_RSHIFT               (KB_MODKEYS+5)
-#define KB_LCTRL                (KB_MODKEYS+6)
-#define KB_RCTRL                (KB_MODKEYS+7)
-#define KB_CAPSLOCK             (KB_MODKEYS+8)
+#define KB_MODKEYS              (0x110)
+#define KB_LALT                 (KB_MODKEYS+0)
+#define KB_RALT                 (KB_MODKEYS+1)
+#define KB_LSHIFT               (KB_MODKEYS+2)
+#define KB_RSHIFT               (KB_MODKEYS+3)
+#define KB_LCTRL                (KB_MODKEYS+4)
+#define KB_RCTRL                (KB_MODKEYS+5)
+#define KB_CAPSLOCK             (KB_MODKEYS+6)
 #define KB_ENTER                (0xd)
 #define KB_BACKSPACE            (0x8)
 
-static uint8_t kb_ps2_scancode2[] = {
+static uint32_t kb_ps2_scancode2[] = {
     KB_NUL, KB_F9, KB_NUL, KB_F5,
     KB_F3, KB_F1, KB_F2, KB_F12,
     KB_NUL, KB_F10, KB_F8, KB_F6,
@@ -66,7 +64,7 @@ static uint8_t kb_ps2_scancode2[] = {
     KB_NUL, KB_NUL, KB_BACKSPACE
 };
 
-static uint8_t kb_ps2_scancode2_shift[] = {
+static uint32_t kb_ps2_scancode2_shift[] = {
     KB_NUL, KB_F9, KB_NUL, KB_F5,
     KB_F3, KB_F1, KB_F2, KB_F12,
     KB_NUL, KB_F10, KB_F8, KB_F6,
@@ -104,23 +102,24 @@ static volatile bool caps_lock = false;
 
 static void kb_scan()
 {
-    uint8_t raw = inb(PS2_PORT_DATA);
+    uint8_t code = inb(PS2_PORT_DATA);
 
-    if (raw == KB_SCAN2_BREAK) {
+    if (code == KB_SCAN2_BREAK) {
         break_next = true;
         goto done;
     }
 
     // Check OOB
-    if (raw > sizeof(kb_ps2_scancode2) ||
-        raw > sizeof(kb_ps2_scancode2_shift))
+    if (code * sizeof(*kb_ps2_scancode2) >
+        sizeof(kb_ps2_scancode2)) {
         goto done;
+    }
 
-    uint8_t key;
+    uint32_t key;
     if (shift_next) {
-        key = kb_ps2_scancode2_shift[raw];
+        key = kb_ps2_scancode2_shift[code];
     } else {
-        key = kb_ps2_scancode2[raw];
+        key = kb_ps2_scancode2[code];
     }
 
     if (key == KB_LSHIFT || key == KB_RSHIFT) {
@@ -149,14 +148,15 @@ static void kb_scan()
             key -= 0x20;
         }
         if (!break_next) {
-            u8_lifo_push(kbuf, key);
+            u8_lifo_push(kbuf, key & 0xff);
         }
         goto input_finished;
     }
 
 input_finished:
-    if (break_next)
+    if (break_next) {
         break_next = false;
+    }
 
 done:
     return;
