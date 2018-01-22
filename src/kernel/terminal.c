@@ -50,12 +50,18 @@ void terminal_scroll_up(size_t n)
 void terminal_write_char(const char c)
 {
     switch (c) {
+    case 0xd: /* CR */
     case '\n':
         term->col = 0;
         term->row += 1;
         break;
     case '\t':
         term->col += 4;
+        break;
+    case 0x8: /* backspace */
+        vga_text_set(term->col-1, term->row, ' ');
+        if (term->col) term->col -= 1;
+        break;
     default:
         vga_text_set(term->col, term->row, c);
         term->col += 1;

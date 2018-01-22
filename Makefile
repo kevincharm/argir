@@ -15,9 +15,10 @@ SRC_DIR=./src
 KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/gdt.o \
+	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
-	$(SRC_DIR)/kernel/irq.o \
+	$(SRC_DIR)/kernel/interrupts.o \
 	$(SRC_DIR)/kernel/isr.o \
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
@@ -27,6 +28,8 @@ KERNEL_OBJS=\
 KLIB_DIR=$(SRC_DIR)/klib
 KLIB_INCLUDE=$(KLIB_DIR)/include
 KLIB_OBJS=\
+	$(KLIB_DIR)/memory/memset.o \
+	$(KLIB_DIR)/queue/deque.o \
 	$(KLIB_DIR)/stdio/putchar.o \
 	$(KLIB_DIR)/stdio/printf.o \
 	$(KLIB_DIR)/string/strlen.o
@@ -58,7 +61,7 @@ grubiso: argir
 	grub-mkrescue -o argir.iso iso
 
 run: grubiso
-	qemu-system-i386 -cdrom argir.iso
+	qemu-system-i386 -cdrom argir.iso -d int,cpu_reset -no-reboot
 
 .PHONY: clean
 
