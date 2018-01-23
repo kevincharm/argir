@@ -2,7 +2,7 @@
 #include <stdio.h>
 #include <stdbool.h>
 #include <memory.h>
-#include <queue.h>
+#include <ringbuf.h>
 #include <kernel/io.h>
 #include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
@@ -109,8 +109,8 @@ static uint32_t kb_ps2_scancode2_shift[] = {
     KB_NUL, KB_NUL, KB_NUL, KB_F7
 };
 
-static struct u8_deque keybuf;
-static struct u8_deque *kbuf = &keybuf;
+static struct u8_ringbuf keybuf;
+static struct u8_ringbuf *kbuf = &keybuf;
 
 static volatile bool break_next = false;
 static volatile bool shift_next = false;
@@ -164,7 +164,7 @@ void keyboard_irq_handler()
             key -= 0x20;
         }
         if (!break_next) {
-            u8_lifo_push(kbuf, key & 0xff);
+            u8_rb_fifo_push(kbuf, key & 0xff);
         }
         goto input_finished;
     }
@@ -207,7 +207,7 @@ static void ps2_flush_output()
 
 void keyboard_init()
 {
-    u8_lifo_init(kbuf);
+    u8_rb_fifo_init(kbuf);
 
     // 8042 initialisation
     uint8_t ret;
@@ -299,14 +299,13 @@ void keyboard_init()
     }
 
     ps2_flush_output();
-    pic_irq_on(1);
 
     printf("Initialised keyboard.\n");
 }
 
 void keyboard_main()
 {
-    while (kbuf->len) {
-        putchar(u8_lifo_pop(kbuf));
+    while (u8_rb_fifo_has_data(kbuf)) {
+        putchar(u8_rb_fifo_pop(kbuf));
     }
 }
