@@ -56,16 +56,4 @@ struct idt_entry idt[IDT_ENTRIES_COUNT];
 void idt_entry_set(size_t index, uint32_t base, uint8_t selector, uint8_t flags);
 void idt_load();
 
-/**
- *  Programmable Interrupt Controller (8259)
- */
-#define PIC1_PORT_CMD           (0x20)
-#define PIC1_PORT_DATA          (PIC1_PORT_CMD+1)
-#define PIC2_PORT_CMD           (0xA0)
-#define PIC2_PORT_DATA          (PIC2_PORT_CMD+1)
-
-void pic_remap();
-void pic_irq_off(unsigned int irq_no);
-void pic_irq_on(unsigned int irq_no);
-
 #endif /* __ARGIR__CPU_H */

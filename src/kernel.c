@@ -18,7 +18,6 @@ void kernel_main()
     interrupts_disable();
 
     gdt_init();
-    pic_remap();
     idt_load();
     interrupts_init();
     keyboard_init();

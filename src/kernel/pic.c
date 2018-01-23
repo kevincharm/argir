@@ -1,6 +1,25 @@
 #include <stdio.h>
 #include <kernel/io.h>
-#include <kernel/cpu.h>
+#include <kernel/pic.h>
+
+static inline void pic_master_eoi()
+{
+    outb(PIC1_PORT_CMD, 0x20);
+}
+
+static inline void pic_slave_eoi()
+{
+    outb(PIC2_PORT_CMD, 0x20);
+}
+
+void pic_eoi(unsigned int int_no)
+{
+    if (int_no >= 0x28) {
+        pic_slave_eoi();
+    }
+
+    pic_master_eoi();
+}
 
 void pic_remap()
 {

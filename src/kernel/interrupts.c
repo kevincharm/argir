@@ -1,8 +1,8 @@
 #include <stddef.h>
 #include <stdio.h>
-#include <kernel/interrupts.h>
-#include <kernel/io.h>
 #include <kernel/cpu.h>
+#include <kernel/interrupts.h>
+#include <kernel/pic.h>
 
 #define IDT_DEFAULT_ISR_HANDLER(n) \
     extern void isr##n(void); \
@@ -17,13 +17,7 @@ void isr_handler(struct interrupt_frame frame)
         keyboard_irq_handler();
     }
 
-    if (frame.int_no >= 0x28) {
-        // EOI to PIC2 (slave)
-        outb(PIC2_PORT_CMD, 0x20);
-    }
-
-    // EOI to PIC1 (master)
-    outb(PIC1_PORT_CMD, 0x20);
+    pic_eoi(frame.int_no);
 }
 
 void isr_stub_handler(struct interrupt_frame frame)
@@ -34,6 +28,8 @@ void isr_stub_handler(struct interrupt_frame frame)
 
 void interrupts_init()
 {
+    // Intel-reserved interrupts
+    pic_remap();
     IDT_DEFAULT_ISR_HANDLER(0);
     IDT_DEFAULT_ISR_HANDLER(1);
     IDT_DEFAULT_ISR_HANDLER(2);
@@ -72,5 +68,7 @@ void interrupts_init()
         idt_entry_set(i, (uint32_t)isr_stub, IDT_ENTRY_DEFAULT_SEL, IDT_ENTRY_DEFAULT_FLAG);
     }
 
-    IDT_DEFAULT_ISR_HANDLER(33); // IRQ1 (PS/2)
+    // IRQ1 (PS/2)
+    IDT_DEFAULT_ISR_HANDLER(33);
+    pic_irq_on(1);
 }
