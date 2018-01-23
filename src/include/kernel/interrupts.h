@@ -1,5 +1,5 @@
-#ifndef __ARGIR__IRQ_H
-#define __ARGIR__IRQ_H
+#ifndef __ARGIR__INTERRUPTS_H
+#define __ARGIR__INTERRUPTS_H
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -33,4 +33,4 @@ static inline bool interrupts_enabled()
 
 void interrupts_init();
 
-#endif /* __ARGIR__IRQ_H */
+#endif /* __ARGIR__INTERRUPTS_H */
