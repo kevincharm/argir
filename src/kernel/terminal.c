@@ -13,7 +13,7 @@ struct terminal {
     size_t width;
     size_t height;
     uint8_t colour;
-    uint16_t *buffer;
+    volatile uint16_t *buffer;
 };
 
 static struct terminal term0;
