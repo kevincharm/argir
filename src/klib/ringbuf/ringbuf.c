@@ -1,35 +1,35 @@
 #include <ringbuf.h>
 #include <memory.h>
 
-bool u8_rb_fifo_has_data(struct u8_ringbuf *d)
+bool u8_rb_fifo_has_data(struct u8_ringbuf *rb)
 {
-    return d->p_write != d->p_read;
+    return rb->p_write != rb->p_read;
 }
 
-void u8_rb_fifo_push(struct u8_ringbuf *d, uint8_t data)
+void u8_rb_fifo_push(struct u8_ringbuf *rb, uint8_t data)
 {
-    if (u8_rb_fifo_has_data(d)) {
-        d->p_read++; // bye bye data
+    if (u8_rb_fifo_has_data(rb)) {
+        rb->p_read++; // bye bye data
     }
-    *(d->p_write++) = data;
-    if (d->p_write >= d->p_end) {
-        d->p_write = d->buffer;
+    *(rb->p_write++) = data;
+    if (rb->p_write >= rb->p_end) {
+        rb->p_write = rb->buffer;
     }
 }
 
-uint8_t u8_rb_fifo_pop(struct u8_ringbuf *d)
+uint8_t u8_rb_fifo_pop(struct u8_ringbuf *rb)
 {
-    uint8_t ret = *(d->p_read++);
-    if (d->p_read >= d->p_end) {
-        d->p_read = d->buffer;
+    uint8_t ret = *(rb->p_read++);
+    if (rb->p_read >= rb->p_end) {
+        rb->p_read = rb->buffer;
     }
     return ret;
 }
 
-void u8_rb_fifo_init(struct u8_ringbuf *d)
+void u8_rb_fifo_init(struct u8_ringbuf *rb)
 {
-    memset(d->buffer, 0, RINGBUF_SIZE);
-    d->p_end = d->buffer + RINGBUF_SIZE;
-    d->p_write = d->buffer;
-    d->p_read = d->buffer;
+    memset(rb->buffer, 0, RINGBUF_SIZE);
+    rb->p_end = rb->buffer + RINGBUF_SIZE;
+    rb->p_write = rb->buffer;
+    rb->p_read = rb->buffer;
 }
