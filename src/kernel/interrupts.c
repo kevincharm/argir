@@ -71,4 +71,6 @@ void interrupts_init()
     // IRQ1 (PS/2)
     IDT_DEFAULT_ISR_HANDLER(33);
     pic_irq_on(1);
+
+    idt_load();
 }
