@@ -116,7 +116,7 @@ static volatile bool break_next = false;
 static volatile bool shift_next = false;
 static volatile bool caps_lock = false;
 
-static void kb_scan()
+void keyboard_irq_handler()
 {
     uint8_t code = inb(PS2_PORT_DATA);
 
@@ -176,11 +176,6 @@ input_finished:
 
 done:
     return;
-}
-
-void keyboard_irq_handler()
-{
-    kb_scan();
 }
 
 static void ps2_wait_write(uint16_t port, uint8_t data)
