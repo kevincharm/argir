@@ -1,7 +1,7 @@
 #include <string.h>
 #include <kernel/terminal.h>
 
-#define VGA_TEXT_MODE_ADDR      ((uint16_t *)0xb8000)
+#define VGA_TEXT_MODE_ADDR      ((volatile uint16_t *)0xb8000)
 #define VGA_TEXT_MODE_WIDTH     (80u)
 #define VGA_TEXT_MODE_HEIGHT    (25u)
 #define VGA_COLOUR_BLACK        (0)
