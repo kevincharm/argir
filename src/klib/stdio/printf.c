@@ -69,7 +69,7 @@ int printf(const char *restrict fmt, ...)
         if (*fmt == 'u') {
             unsigned int u = va_arg(ap, unsigned int);
             int ulen = uintlen(u);
-            for (size_t i=0; i<ulen; i++) {
+            for (size_t i=0; i<(size_t)ulen; i++) {
                 int tens = pow10(ulen-1-i);
                 int n = u/tens;
                 putchar('0'+n);
