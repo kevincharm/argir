@@ -8,12 +8,12 @@ bool u8_rb_fifo_has_data(struct u8_ringbuf *rb)
 
 void u8_rb_fifo_push(struct u8_ringbuf *rb, uint8_t data)
 {
-    if (u8_rb_fifo_has_data(rb)) {
-        rb->p_read++; // bye bye data
-    }
     *(rb->p_write++) = data;
     if (rb->p_write >= rb->p_end) {
         rb->p_write = rb->buffer;
+    }
+    if (rb->p_read == rb->p_write) {
+        rb->p_read++; // bye bye data
     }
 }
 
