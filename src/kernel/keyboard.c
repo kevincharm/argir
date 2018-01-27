@@ -4,7 +4,6 @@
 #include <memory.h>
 #include <ringbuf.h>
 #include <kernel/io.h>
-#include <kernel/interrupts.h>
 #include <kernel/keyboard.h>
 
 #define KB_SCAN2_BREAK          (0xf0) /* TODO: Put in keycode map */
