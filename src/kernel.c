@@ -6,6 +6,7 @@
 #include <kernel/interrupts.h>
 #include <kernel/terminal.h>
 #include <kernel/keyboard.h>
+#include <kernel/pci.h>
 
 void kernel_main()
 {
@@ -22,6 +23,8 @@ void kernel_main()
     keyboard_init();
 
     interrupts_enable();
+
+    pci_init();
 
     for (;;) {
         keyboard_main();

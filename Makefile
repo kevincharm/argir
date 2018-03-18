@@ -22,6 +22,7 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/isr.o \
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
+	$(SRC_DIR)/kernel/pci.o \
 	$(SRC_DIR)/boot.o \
 	$(SRC_DIR)/kernel.o
 
