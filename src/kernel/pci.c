@@ -19,14 +19,10 @@ static uint16_t pci_cfg_readw(uint8_t bus, uint8_t device, uint8_t func, uint8_t
     return (inl(PCI_CFG_IN_PORT) >> (((uint32_t)offset & 2) * 8)) & 0xffff;
 }
 
-static void pci_check_slot(uint8_t bus, uint8_t device)
+static void pci_check_func(uint8_t bus, uint8_t device, uint8_t func)
 {
-    uint16_t vendor_id = pci_cfg_readw(bus, device, 0, 0);
-    if (vendor_id == PCI_NO_DEVICE) {
-        goto done;
-    }
-
-    uint16_t device_id = pci_cfg_readw(bus, device, 0, 2);
+    uint16_t vendor_id = pci_cfg_readw(bus, device, 0, 0); // dupe
+    uint16_t device_id = pci_cfg_readw(bus, device, 0, 2); // dupe
 
     uint16_t prog_rev = pci_cfg_readw(bus, device, 0, 8);
     uint8_t prog_if = (prog_rev >> 8) & 0xff;
@@ -36,6 +32,10 @@ static void pci_check_slot(uint8_t bus, uint8_t device)
     uint8_t class_code = (class_subclass >> 8) & 0xff;
     uint8_t subclass = class_subclass & 0xff;
 
+    uint16_t bist_header = pci_cfg_readw(bus, device, 0, 14);
+    uint8_t bist = (bist_header >> 8) & 0xff;
+    uint8_t header_type = bist_header & 0xff;
+
     printf("Found PCI device: { "
         "vendor_id: %u, "
         "device_id: %u, "
@@ -43,6 +43,23 @@ static void pci_check_slot(uint8_t bus, uint8_t device)
         "subclass: %u "
         " }\n",
         vendor_id, device_id, class_code, subclass);
+    if ((header_type & 0x80) != 0) {
+        for (int i=0; i<8; i++) {
+            pci_check_func(bus, device, i);
+        }
+    }
+}
+
+static void pci_check_slot(uint8_t bus, uint8_t device)
+{
+    uint16_t vendor_id = pci_cfg_readw(bus, device, 0, 0);
+    if (vendor_id == PCI_NO_DEVICE) {
+        goto done;
+    }
+
+    uint16_t device_id = pci_cfg_readw(bus, device, 0, 2);
+
+    pci_check_func(bus, device, 0);
 
 done:
     return;
