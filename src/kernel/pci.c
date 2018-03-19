@@ -1,65 +1,50 @@
 #include <kernel/io.h>
 #include <kernel/pci.h>
+#include <kernel/interrupts.h>
 #include <stdio.h>
 
 #define PCI_CFG_OUT_PORT    (0xcf8)
 #define PCI_CFG_IN_PORT     (0xcfc)
 #define PCI_NO_DEVICE       (0xffff)
 
-static uint16_t pci_cfg_readw(uint8_t bus, uint8_t device, uint8_t func, uint8_t offset)
+static uint32_t pci_cfg_readl(uint8_t bus, uint8_t device, uint8_t func, uint8_t offset)
 {
     uint32_t address =
         (1ul << 31) |
-        ((uint32_t)bus << 16) |
-        ((uint32_t)device << 11) |
-        ((uint32_t)func << 8) |
-        ((uint32_t)offset << 2);
+        (bus << 16) |
+        (device << 11) |
+        (func << 8) |
+        (offset & 0xfc);
 
     outl(PCI_CFG_OUT_PORT, address);
-    return (inl(PCI_CFG_IN_PORT) >> (((uint32_t)offset & 2) * 8)) & 0xffff;
+    return inl(PCI_CFG_IN_PORT);
 }
 
-static void pci_check_func(uint8_t bus, uint8_t device, uint8_t func)
+static void pci_check_slot(uint8_t bus, uint8_t device, uint8_t func)
 {
-    uint16_t vendor_id = pci_cfg_readw(bus, device, 0, 0); // dupe
-    uint16_t device_id = pci_cfg_readw(bus, device, 0, 2); // dupe
-
-    uint16_t prog_rev = pci_cfg_readw(bus, device, 0, 8);
-    uint8_t prog_if = (prog_rev >> 8) & 0xff;
-    uint8_t rev = prog_rev & 0xff;
-
-    uint16_t class_subclass = pci_cfg_readw(bus, device, 0, 10);
-    uint8_t class_code = (class_subclass >> 8) & 0xff;
-    uint8_t subclass = class_subclass & 0xff;
-
-    uint16_t bist_header = pci_cfg_readw(bus, device, 0, 14);
-    uint8_t bist = (bist_header >> 8) & 0xff;
-    uint8_t header_type = bist_header & 0xff;
-
-    printf("Found PCI device: { "
-        "vendor_id: %u, "
-        "device_id: %u, "
-        "class: %u, "
-        "subclass: %u "
-        " }\n",
-        vendor_id, device_id, class_code, subclass);
-    if ((header_type & 0x80) != 0) {
-        for (int i=0; i<8; i++) {
-            pci_check_func(bus, device, i);
-        }
-    }
-}
-
-static void pci_check_slot(uint8_t bus, uint8_t device)
-{
-    uint16_t vendor_id = pci_cfg_readw(bus, device, 0, 0);
-    if (vendor_id == PCI_NO_DEVICE) {
+    // printf("Checking %u, %u, %u\n", bus, device, func);
+    uint32_t reg0 = pci_cfg_readl(bus, device, func, 0);
+    uint16_t device_id = (reg0 >> 16) & 0xffff;
+    uint16_t vendor_id = reg0 & 0xffff;
+    if (vendor_id == 0xffff) {
         goto done;
     }
 
-    uint16_t device_id = pci_cfg_readw(bus, device, 0, 2);
+    printf("Found PCI device:\n-> vendor: %u, device: %u\n", vendor_id, device_id);
 
-    pci_check_func(bus, device, 0);
+    uint32_t reg8 = pci_cfg_readl(bus, device, func, 8);
+    uint16_t reg8_hi = (reg8 >> 16) & 0xffff;
+    uint8_t class_code = (reg8_hi >> 8) & 0xff;
+    uint8_t subclass = reg8_hi & 0xff;
+
+    printf("-> class: %u, subclass: %u\n", class_code, subclass);
+
+    uint32_t reg12 = pci_cfg_readl(bus, device, func, 12);
+    uint16_t reg12_hi = (reg12 >> 16) & 0xff;
+    uint8_t bist = (reg12_hi >> 8) & 0xff;
+    uint8_t header_type = reg12_hi & 0xff;
+
+    printf("-> header_type: %u\n", header_type);
 
 done:
     return;
@@ -67,9 +52,11 @@ done:
 
 void pci_init()
 {
+    printf("\n");
     for (int bus=0; bus<256; bus++) {
         for (int dev=0; dev<32; dev++) {
-            pci_check_slot(bus, dev);
+            pci_check_slot(bus, dev, 0);
         }
     }
+    printf("Initialised PCI.\n");
 }
