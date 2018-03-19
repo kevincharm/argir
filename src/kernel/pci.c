@@ -1,6 +1,5 @@
 #include <kernel/io.h>
 #include <kernel/pci.h>
-#include <kernel/interrupts.h>
 #include <stdio.h>
 
 #define PCI_CFG_OUT_PORT    (0xcf8)
@@ -22,7 +21,6 @@ static uint32_t pci_cfg_readl(uint8_t bus, uint8_t device, uint8_t func, uint8_t
 
 static void pci_check_slot(uint8_t bus, uint8_t device, uint8_t func)
 {
-    // printf("Checking %u, %u, %u\n", bus, device, func);
     uint32_t reg0 = pci_cfg_readl(bus, device, func, 0);
     uint16_t device_id = (reg0 >> 16) & 0xffff;
     uint16_t vendor_id = reg0 & 0xffff;
