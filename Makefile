@@ -61,9 +61,13 @@ grubiso: argir
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o argir.iso iso
 
+QEMU=qemu-system-i386 -cdrom argir.iso -no-reboot -netdev user,id=eth0 -device ne2k_pci,netdev=eth0
+
 run: grubiso
-	qemu-system-i386 -cdrom argir.iso -d int,cpu_reset -no-reboot \
-	-netdev user,id=eth0 -device ne2k_pci,netdev=eth0
+	$(QEMU)
+
+debug: grubiso
+	$(QEMU) -d int,cpu_reset
 
 .PHONY: clean
 
