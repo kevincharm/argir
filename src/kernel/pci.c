@@ -33,12 +33,17 @@ static void pci_check_slot(struct pci *pci, uint8_t bus, uint8_t device, uint8_t
     uint16_t reg8_hi = (reg8 >> 16) & 0xffff;
     uint8_t class_code = (reg8_hi >> 8) & 0xff;
     uint8_t subclass = reg8_hi & 0xff;
+    uint16_t reg8_lo = reg8 & 0xffff;
+    uint8_t prog_if = (reg8_lo >> 8) & 0xff;
+    uint8_t rev_id = reg8_lo & 0xff;
 
     size_t i = pci->dev_count++;
     pci->dev[i].vendor_id = vendor_id;
     pci->dev[i].device_id = device_id;
     pci->dev[i].class_code = class_code;
     pci->dev[i].subclass = subclass;
+    pci->dev[i].prog_if = prog_if;
+    pci->dev[i].rev_id = rev_id;
 
 done:
     return;

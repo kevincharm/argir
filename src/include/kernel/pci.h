@@ -11,6 +11,7 @@ struct pci_descriptor {
     uint8_t class_code;
     uint8_t subclass;
     uint8_t prog_if;
+    uint8_t rev_id;
     uint32_t bar[PCI_BAR_COUNT_MAX];
 };
 
