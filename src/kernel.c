@@ -10,7 +10,7 @@
 
 struct pci g_pci;
 
-void init_pci()
+static void init_pci()
 {
     struct pci *pci = &g_pci;
     pci_init(pci);
@@ -21,13 +21,29 @@ void init_pci()
     }
 }
 
-void kernel_main()
+static void print_logo()
 {
-    terminal_init();
     printf(
+        "\n                                @@\\\n"
+        "                                \\__|\n"
+        "   @@@@@@\\   @@@@@@\\   @@@@@@\\  @@\\  @@@@@@\\   @@@@@@\\   @@@@@@@\\\n"
+        "   \\____@@\\ @@  __@@\\ @@  __@@\\ @@ |@@  __@@\\ @@  __@@\\ @@  _____|\n"
+        "   @@@@@@@ |@@ |  \\__|@@ /  @@ |@@ |@@ |  \\__|@@ /  @@ |\\@@@@@@\\\n"
+        "  @@  __@@ |@@ |      @@ |  @@ |@@ |@@ |      @@ |  @@ | \\____@@\\\n"
+        "  \\@@@@@@@ |@@ |      \\@@@@@@@ |@@ |@@ |      \\@@@@@@  |@@@@@@@  |\n"
+        "   \\_______|\\__|       \\____@@ |\\__|\\__|       \\______/ \\_______/\n"
+        "                      @@\\   @@ |\n"
+        "                      \\@@@@@@  |\n"
+        "                       \\______/\n\n"
         "Argir i386\n"
         "Build "__ARGIR_BUILD_COMMIT__"\n\n"
     );
+}
+
+void kernel_main()
+{
+    terminal_init();
+    print_logo();
 
     interrupts_disable();
 
