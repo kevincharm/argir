@@ -16,13 +16,13 @@ SECTIONS
         *(.rodata)
     }
 
-    /* Read-write data (initialized) */
+    /* Read-write data (initialised) */
     .data BLOCK(4K) : ALIGN(4K)
     {
         *(.data)
     }
 
-    /* Read-write data (uninitialized) and stack */
+    /* Read-write data (uninitialised) and stack */
     .bss BLOCK(4K) : ALIGN(4K)
     {
         *(COMMON)
