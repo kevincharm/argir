@@ -1,9 +1,17 @@
 CONFIG_DIR=./config
 ISO_DIR=./iso
 
+# Docker
+DOCKER_IMAGE=kevincharm/i686-elf-gcc-toolchain:5.5.0
+DOCKER_SH=docker run -it --rm \
+	-v `pwd`:/work \
+	-w /work \
+	--security-opt seccomp=unconfined \
+	$(DOCKER_IMAGE) /bin/bash -c
+
 # Compilers
-AS=i386-elf-as
-CC=i386-elf-gcc
+AS=i686-elf-as
+CC=i686-elf-gcc
 CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra
 
 # Build info
@@ -37,7 +45,12 @@ KLIB_OBJS=\
 
 default: clean all
 
-all: argir
+.PHONY: clean
+
+all:
+	$(DOCKER_SH) "make _all"
+
+_all: argir
 
 argir: $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
 	$(CC) -T kernel.ld \
@@ -68,8 +81,6 @@ run: grubiso
 
 debug: grubiso
 	$(QEMU) -d int,cpu_reset
-
-.PHONY: clean
 
 clean:
 	rm -f *.bin
