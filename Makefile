@@ -2,7 +2,7 @@ CONFIG_DIR=./config
 ISO_DIR=./iso
 
 # Docker
-DOCKER_IMAGE=kevincharm/i686-elf-gcc-toolchain:5.5.0
+DOCKER_IMAGE=kevincharm/i686-elf-gcc-toolchain:5.5.0-git
 DOCKER_SH=docker run -it --rm \
 	-v `pwd`:/work \
 	-w /work \
@@ -17,6 +17,9 @@ CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra
 # Build info
 GIT_COMMIT=$(shell git log -1 --pretty=format:"%H")
 KERNEL_DEFINES=__ARGIR_BUILD_COMMIT__=\"$(GIT_COMMIT)\"
+
+# OUTPUT
+OUTPUT=argir
 
 # Sources
 SRC_DIR=./src
@@ -50,11 +53,11 @@ default: clean all
 all:
 	$(DOCKER_SH) "make _all"
 
-_all: argir
+_all: $(OUTPUT).iso
 
-argir: $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
+$(OUTPUT): $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
 	$(CC) -T kernel.ld \
-	-o argir.bin -ffreestanding -nostdlib -lgcc \
+	-o $@.bin -ffreestanding -nostdlib -lgcc \
 	$(KLIB_OBJS) \
 	$(KERNEL_OBJS)
 
@@ -67,19 +70,19 @@ argir: $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
 	-D$(KERNEL_DEFINES)
 
 # Disk image & Qemu
-grubiso: argir
+$(OUTPUT).iso: $(OUTPUT).bin
 	rm -rf $(ISO_DIR)
 	mkdir -p $(ISO_DIR)/boot/grub
-	mv argir.bin $(ISO_DIR)/boot/argir.bin
+	mv $(OUTPUT).bin $(ISO_DIR)/boot/$(OUTPUT).bin
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
-	grub-mkrescue -o argir.iso iso
+	grub-mkrescue -o $(OUTPUT).iso iso
 
-QEMU=qemu-system-i386 -cdrom argir.iso -no-reboot -netdev user,id=eth0 -device ne2k_pci,netdev=eth0
+QEMU=qemu-system-i386 -cdrom $(OUTPUT).iso -no-reboot -netdev user,id=eth0 -device ne2k_pci,netdev=eth0
 
-run: grubiso
+run: all
 	$(QEMU)
 
-debug: grubiso
+debug: all
 	$(QEMU) -d int,cpu_reset
 
 clean:
