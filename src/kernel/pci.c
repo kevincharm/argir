@@ -3,24 +3,22 @@
 #include <kernel/pci.h>
 #include <stdio.h>
 
-#define PCI_CFG_OUT_PORT    (0xcf8)
-#define PCI_CFG_IN_PORT     (0xcfc)
-#define PCI_NO_DEVICE       (0xffff)
+#define PCI_CFG_OUT_PORT (0xcf8)
+#define PCI_CFG_IN_PORT (0xcfc)
+#define PCI_NO_DEVICE (0xffff)
 
-static uint32_t pci_cfg_readl(uint8_t bus, uint8_t device, uint8_t func, uint8_t offset)
+static uint32_t pci_cfg_readl(uint8_t bus, uint8_t device, uint8_t func,
+                              uint8_t offset)
 {
-    uint32_t address =
-        (1ul << 31) |
-        (bus << 16) |
-        (device << 11) |
-        (func << 8) |
-        (offset & 0xfc);
+    uint32_t address = (1ul << 31) | (bus << 16) | (device << 11) |
+                       (func << 8) | (offset & 0xfc);
 
     outl(PCI_CFG_OUT_PORT, address);
     return inl(PCI_CFG_IN_PORT);
 }
 
-static void pci_check_slot(struct pci *pci, uint8_t bus, uint8_t device, uint8_t func)
+static void pci_check_slot(struct pci *pci, uint8_t bus, uint8_t device,
+                           uint8_t func)
 {
     uint32_t reg0 = pci_cfg_readl(bus, device, func, 0);
     uint16_t device_id = (reg0 >> 16) & 0xffff;
@@ -52,14 +50,14 @@ done:
 void pci_init(struct pci *pci)
 {
     pci->dev_count = 0;
-    for (int i=0; i<PCI_DEVICE_COUNT_MAX; i++) {
-        struct pci_descriptor *p = pci->dev+i;
+    for (int i = 0; i < PCI_DEVICE_COUNT_MAX; i++) {
+        struct pci_descriptor *p = pci->dev + i;
         memset(p, 0, sizeof(*p));
         memset(p->bar, 0, PCI_BAR_COUNT_MAX);
     }
 
-    for (int bus=0; bus<256; bus++) {
-        for (int dev=0; dev<32; dev++) {
+    for (int bus = 0; bus < 256; bus++) {
+        for (int dev = 0; dev < 32; dev++) {
             pci_check_slot(pci, bus, dev, 0);
         }
     }

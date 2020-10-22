@@ -8,16 +8,20 @@
 #include <kernel/keyboard.h>
 #include <kernel/pci.h>
 
+#ifndef __ARGIR_BUILD_COMMIT__
+#define __ARGIR_BUILD_COMMIT__ "balls"
+#endif
+
 struct pci g_pci;
 
 static void init_pci()
 {
     struct pci *pci = &g_pci;
     pci_init(pci);
-    for (int i=0; i<pci->dev_count; i++) {
-        struct pci_descriptor *p = pci->dev+i;
-        printf("PCI device <vendor: %u, device: %u>\n",
-            p->vendor_id, p->device_id);
+    for (int i = 0; i < pci->dev_count; i++) {
+        struct pci_descriptor *p = pci->dev + i;
+        printf("PCI device <vendor: %u, device: %u>\n", p->vendor_id,
+               p->device_id);
     }
 }
 
@@ -36,8 +40,7 @@ static void print_logo()
         "                      \\@@@@@@  |\n"
         "                       \\______/\n\n"
         "Argir i386\n"
-        "Build "__ARGIR_BUILD_COMMIT__"\n\n"
-    );
+        "Build " __ARGIR_BUILD_COMMIT__ "\n\n");
 }
 
 void kernel_main()

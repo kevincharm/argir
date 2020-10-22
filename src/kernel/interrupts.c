@@ -4,9 +4,10 @@
 #include <kernel/interrupts.h>
 #include <kernel/pic.h>
 
-#define IDT_DEFAULT_ISR_HANDLER(n) \
-    extern void isr##n(void); \
-    idt_entry_set(n, (uint32_t)isr##n, IDT_ENTRY_DEFAULT_SEL, IDT_ENTRY_DEFAULT_FLAG);
+#define IDT_DEFAULT_ISR_HANDLER(n)                                             \
+    extern void isr##n(void);                                                  \
+    idt_entry_set(n, (uint32_t)isr##n, IDT_ENTRY_DEFAULT_SEL,                  \
+                  IDT_ENTRY_DEFAULT_FLAG);
 
 extern void isr_stub(void);
 extern void keyboard_irq_handler(void);
@@ -64,8 +65,9 @@ void interrupts_init()
     IDT_DEFAULT_ISR_HANDLER(31);
 
     // Redirect the rest of the IDT entries to the isr stub handler as a sane default
-    for (size_t i=32; i<256; i++) {
-        idt_entry_set(i, (uint32_t)isr_stub, IDT_ENTRY_DEFAULT_SEL, IDT_ENTRY_DEFAULT_FLAG);
+    for (size_t i = 32; i < 256; i++) {
+        idt_entry_set(i, (uint32_t)isr_stub, IDT_ENTRY_DEFAULT_SEL,
+                      IDT_ENTRY_DEFAULT_FLAG);
     }
 
     // IRQ1 (PS/2)

@@ -6,8 +6,8 @@
  *  http://pubs.opengroup.org/onlinepubs/9699919799/basedefs/stdio.h.html
  */
 
-#define EOF         (-1)
-#define BUFSIZ      (512)
+#define EOF (-1)
+#define BUFSIZ (512)
 
 int printf(const char *restrict, ...);
 int putchar(int);

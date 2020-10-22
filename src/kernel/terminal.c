@@ -1,11 +1,11 @@
 #include <string.h>
 #include <kernel/terminal.h>
 
-#define VGA_TEXT_MODE_ADDR      ((volatile uint16_t *)0xb8000)
-#define VGA_TEXT_MODE_WIDTH     (80u)
-#define VGA_TEXT_MODE_HEIGHT    (25u)
-#define VGA_COLOUR_BLACK        (0)
-#define VGA_COLOUR_WHITE        (15)
+#define VGA_TEXT_MODE_ADDR ((volatile uint16_t *)0xb8000)
+#define VGA_TEXT_MODE_WIDTH (80u)
+#define VGA_TEXT_MODE_HEIGHT (25u)
+#define VGA_COLOUR_BLACK (0)
+#define VGA_COLOUR_WHITE (15)
 
 struct terminal {
     size_t row;
@@ -39,10 +39,10 @@ void terminal_scroll_up(size_t n)
 {
     size_t total = term->width * term->height;
     size_t sub = n * term->width;
-    for (size_t i=sub; i<total; i++) {
-        term->buffer[i-sub] = term->buffer[i];
+    for (size_t i = sub; i < total; i++) {
+        term->buffer[i - sub] = term->buffer[i];
     }
-    for (size_t i=total-sub; i<total; i++) {
+    for (size_t i = total - sub; i < total; i++) {
         term->buffer[i] = ' ';
     }
 }
@@ -59,8 +59,9 @@ void terminal_write_char(const char c)
         term->col += 4;
         break;
     case 0x8: /* backspace */
-        vga_text_set(term->col-1, term->row, ' ');
-        if (term->col) term->col -= 1;
+        vga_text_set(term->col - 1, term->row, ' ');
+        if (term->col)
+            term->col -= 1;
         break;
     default:
         vga_text_set(term->col, term->row, c);
@@ -79,8 +80,8 @@ void terminal_write_char(const char c)
 
 void terminal_clear()
 {
-    for (size_t y=0; y<(term->height); y++) {
-        for (size_t x=0; x<(term->width); x++) {
+    for (size_t y = 0; y < (term->height); y++) {
+        for (size_t x = 0; x < (term->width); x++) {
             vga_text_set(x, y, ' ');
         }
     }
@@ -89,7 +90,7 @@ void terminal_clear()
 void terminal_write(const char *str)
 {
     size_t len = strlen(str);
-    for (size_t i=0; i<len; i++) {
+    for (size_t i = 0; i < len; i++) {
         terminal_write_char(str[i]);
     }
 }
