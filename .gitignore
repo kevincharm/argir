@@ -3,3 +3,4 @@
 *.bin
 *.iso
 iso/
+tmp/

@@ -13,7 +13,8 @@ DOCKER_SH=docker run -it --rm \
 AS=x86_64-elf-as
 CC=x86_64-elf-gcc
 LD=x86_64-elf-ld
-CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2
+CFLAGS=-m64 -std=gnu11 -ffreestanding -O2 -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone \
+	-mgeneral-regs-only -mno-mmx -mno-sse -mno-sse2 -mno-avx
 
 # Build info
 GIT_COMMIT=$(shell git log -1 --pretty=format:"%H")
@@ -25,7 +26,6 @@ KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
 	$(SRC_DIR)/boot.o \
 	$(SRC_DIR)/kernel/gdt.o \
-	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
 	$(SRC_DIR)/kernel/interrupts.o \
@@ -54,7 +54,7 @@ all:
 _all: argir.iso
 
 argir.bin: $(KERNEL_OBJS) $(KLIB_OBJS)
-	$(CC) $(CFLAGS) -T kernel.ld -lgcc -o $@ $(KERNEL_OBJS) $(KLIB_OBJS)
+	$(CC) -z max-page-size=0x1000 $(CFLAGS) -T kernel.ld -lgcc -o $@ $(KERNEL_OBJS) $(KLIB_OBJS)
 
 %.o: %.s
 	$(AS) $< -o $@
@@ -71,7 +71,7 @@ argir.iso: argir.bin
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o argir.iso iso
 
-QEMU=qemu-system-x86_64 -cdrom argir.iso -no-reboot -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio
+QEMU=qemu-system-x86_64 -cdrom argir.iso -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d cpu_reset -D ./tmp/qemu.log
 
 run: all
 	$(QEMU)
@@ -84,3 +84,14 @@ clean:
 	rm -f *.iso
 	rm -rf $(ISO_DIR)
 	find $(SRC_DIR) -type f -name '*.o' -delete
+
+print_toolchain:
+	$(DOCKER_SH) "make _print_toolchain"
+_print_toolchain:
+	$(CC) --version
+
+readsec:
+	greadelf -S $(ISO_DIR)/boot/argir.bin
+
+objdump:
+	objdump -d $(ISO_DIR)/boot/argir.bin

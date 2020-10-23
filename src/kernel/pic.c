@@ -14,9 +14,9 @@ static inline void pic_slave_eoi()
 
 void pic_eoi(unsigned int int_no)
 {
-    if (int_no >= 0x28) {
-        pic_slave_eoi();
-    }
+    // if (int_no >= 0x28) {
+    pic_slave_eoi();
+    // }
 
     pic_master_eoi();
 }
@@ -36,6 +36,12 @@ void pic_remap()
     outb(PIC2_PORT_DATA, 0x01);
 
     outb(PIC1_PORT_DATA, 0xff);
+    outb(PIC2_PORT_DATA, 0xff);
+}
+
+void pic_enable_only_keyboard()
+{
+    outb(PIC1_PORT_DATA, 0xfd);
     outb(PIC2_PORT_DATA, 0xff);
 }
 

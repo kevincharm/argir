@@ -1,3 +1,4 @@
+.section .text
 .code64
 .global gdt_rst
 gdt_rst:
