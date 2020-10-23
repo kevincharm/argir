@@ -1,13 +1,8 @@
 # argir
 
-Nothing to see here, carry on...
+This is my very slow-moving hobby kernel that I hack on in my spare time. Currently, nothing works! 😌
 
-### Cross Compilation Toolchain
+## Toolchain
 
-- [binutils 2.25](https://ftp.gnu.org/gnu/binutils/binutils-2.25.tar.gz)
-- [gcc 5.5.0](https://ftp.gnu.org/gnu/gcc/gcc-5.5.0/gcc-5.5.0.tar.gz)
-
-### Testing
-
-- [grub](https://ftp.gnu.org/gnu/grub/grub-2.02.tar.gz) - configure with `--target=i386-pc`
-- [xorriso](https://www.gnu.org/software/xorriso/xorriso-1.4.8.tar.gz)
+- [docker](https://www.docker.com/products/docker-desktop) - The cross compiler and other build tools are pulled as a Docker image during build time for reproducibility.
+- [qemu](https://www.qemu.org/download) - I develop this on QEMU. Of course, you can also just burn the ISO and boot it on real metal.
