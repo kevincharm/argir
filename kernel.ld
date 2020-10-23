@@ -1,12 +1,18 @@
+OUTPUT_FORMAT("elf64-x86-64", "elf64-x86-64", "elf64-x86-64")
+OUTPUT_ARCH("i386:x86-64")
 ENTRY(_start)
 
 SECTIONS
 {
     . = 1M;
 
+    .multiboot2 BLOCK(4K): ALIGN(4K)
+    {
+        KEEP(*(.multiboot))
+    }
+
     .text BLOCK(4K) : ALIGN(4K)
     {
-        *(.multiboot)
         *(.text)
     }
 

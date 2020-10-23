@@ -39,18 +39,20 @@ static void print_logo()
         "                      @@\\   @@ |\n"
         "                      \\@@@@@@  |\n"
         "                       \\______/\n\n"
-        "Argir i386\n"
+        "Argir x86_64\n"
         "Build " __ARGIR_BUILD_COMMIT__ "\n\n");
 }
 
 void kernel_main()
 {
+    // gdt_init();
+
     terminal_init();
     print_logo();
 
     interrupts_disable();
+    __asm__ volatile("hlt");
 
-    gdt_init();
     interrupts_init();
     keyboard_init();
     init_pci();

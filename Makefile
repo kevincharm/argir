@@ -2,7 +2,7 @@ CONFIG_DIR=./config
 ISO_DIR=./iso
 
 # Docker
-DOCKER_IMAGE=kevincharm/i686-elf-gcc-toolchain:5.5.0-git
+DOCKER_IMAGE=kevincharm/x86_64-elf-gcc-toolchain:latest
 DOCKER_SH=docker run -it --rm \
 	-v `pwd`:/work \
 	-w /work \
@@ -10,21 +10,20 @@ DOCKER_SH=docker run -it --rm \
 	$(DOCKER_IMAGE) /bin/bash -c
 
 # Compilers
-AS=i686-elf-as
-CC=i686-elf-gcc
-CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra
+AS=x86_64-elf-as
+CC=x86_64-elf-gcc
+LD=x86_64-elf-ld
+CFLAGS=-std=gnu11 -ffreestanding -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone -mno-mmx -mno-sse -mno-sse2
 
 # Build info
 GIT_COMMIT=$(shell git log -1 --pretty=format:"%H")
 KERNEL_DEFINES=__ARGIR_BUILD_COMMIT__=\"$(GIT_COMMIT)\"
 
-# OUTPUT
-OUTPUT=argir
-
 # Sources
 SRC_DIR=./src
 KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
+	$(SRC_DIR)/boot.o \
 	$(SRC_DIR)/kernel/gdt.o \
 	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
@@ -34,7 +33,6 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
 	$(SRC_DIR)/kernel/pci.o \
-	$(SRC_DIR)/boot.o \
 	$(SRC_DIR)/kernel.o
 
 KLIB_DIR=$(SRC_DIR)/klib
@@ -53,31 +51,27 @@ default: clean all
 all:
 	$(DOCKER_SH) "make _all"
 
-_all: $(OUTPUT).iso
+_all: argir.iso
 
-$(OUTPUT): $(KLIB_OBJS) $(KERNEL_OBJS) $(SRC_DIR)/boot.o
-	$(CC) -T kernel.ld \
-	-o $@.bin -ffreestanding -nostdlib -lgcc \
-	$(KLIB_OBJS) \
-	$(KERNEL_OBJS)
+argir.bin: $(KERNEL_OBJS) $(KLIB_OBJS)
+	$(CC) $(CFLAGS) -T kernel.ld -lgcc -o $@ $(KERNEL_OBJS) $(KLIB_OBJS)
 
 %.o: %.s
 	$(AS) $< -o $@
 
 %.o: %.c
 	$(CC) $(CFLAGS) -c $< -o $@ \
-	-I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) \
-	-D$(KERNEL_DEFINES)
+	-I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) -D$(KERNEL_DEFINES)
 
 # Disk image & Qemu
-$(OUTPUT).iso: $(OUTPUT).bin
+argir.iso: argir.bin
 	rm -rf $(ISO_DIR)
 	mkdir -p $(ISO_DIR)/boot/grub
-	mv $(OUTPUT).bin $(ISO_DIR)/boot/$(OUTPUT).bin
+	mv argir.bin $(ISO_DIR)/boot/argir.bin
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
-	grub-mkrescue -o $(OUTPUT).iso iso
+	grub-mkrescue -o argir.iso iso
 
-QEMU=qemu-system-i386 -cdrom $(OUTPUT).iso -no-reboot -netdev user,id=eth0 -device ne2k_pci,netdev=eth0
+QEMU=qemu-system-x86_64 -cdrom argir.iso -no-reboot -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio
 
 run: all
 	$(QEMU)

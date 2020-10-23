@@ -1,3 +1,4 @@
+.code64
 .global gdt_rst
 gdt_rst:
     mov $0x10, %ax
@@ -6,6 +7,6 @@ gdt_rst:
     mov %ax, %fs
     mov %ax, %gs
     mov %ax, %ss
-    ljmp $0x8, $code_seg        # Far jump to 0x8 (CS)
+    jmp code_seg        # Far jump to 0x8 (CS)
 code_seg:
     ret
