@@ -45,14 +45,12 @@ static void print_logo()
 
 void kernel_main()
 {
-    // gdt_init();
+    interrupts_disable();
 
     terminal_init();
     print_logo();
 
-    interrupts_disable();
-    __asm__ volatile("hlt");
-
+    gdt_init();
     interrupts_init();
     keyboard_init();
     init_pci();

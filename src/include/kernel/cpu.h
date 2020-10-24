@@ -7,53 +7,113 @@
 /**
  *  Global Descriptor Table
  */
-#define GDT_ENTRIES_COUNT       (3)
+#define GDT_ENTRIES_COUNT (3)
 
-struct gdt_entry {
+/**
+ * Generic segment descriptor (long mode)
+ * AMD64 APM p.80
+ */
+struct gen_seg_desc {
+    uint16_t limit_lo : 16;
+    uint16_t base_lo : 16;
+    uint8_t base_mid : 8;
+    uint8_t access : 8;
+    uint8_t limit_hi_gran : 8;
+    uint8_t base_hi : 8;
+} __attribute__((packed));
+
+/**
+ * Code segment descriptor (long mode)
+ * AMD64 APM p.82
+ */
+struct code_seg_desc {
     uint16_t limit_lo;
     uint16_t base_lo;
     uint8_t base_mid;
-    uint8_t access;
-    uint8_t gran;
+    uint8_t a : 1;
+    uint8_t r : 1;
+    uint8_t c : 1;
+    uint8_t one : 1;
+    uint8_t another_one : 1; /** D-D-D-DJ Khaled */
+    uint8_t dpl : 2;
+    uint8_t p : 1;
+    uint8_t limit_hi : 4;
+    uint8_t avl : 1;
+    uint8_t l : 1;
+    uint8_t d : 1;
+    uint8_t g : 1;
     uint8_t base_hi;
-}__attribute__((packed));
+} __attribute__((packed));
 
-struct gdtr {
-    uint16_t limit;
-    uint32_t base;
-}__attribute__((packed));
+/**
+ * Data segment descriptor
+ * AMD64 APM p.83
+ */
+struct data_seg_desc {
+    uint16_t limit_lo : 16;
+    uint16_t base_lo : 16;
+    uint8_t base_mid : 8;
+    uint8_t a : 1;
+    uint8_t w : 1;
+    uint8_t e : 1;
+    uint8_t zero : 1;
+    uint8_t one : 1;
+    uint8_t dpl : 2;
+    uint8_t p : 1;
+    uint8_t limit_hi : 4;
+    uint8_t avl : 1;
+    uint8_t l : 1;
+    uint8_t db : 1;
+    uint8_t g : 1;
+    uint8_t base_hi : 8;
+} __attribute__((packed));
 
-struct gdt_entry gdt[GDT_ENTRIES_COUNT];
+struct dtr {
+    volatile uint16_t limit;
+    volatile uint64_t base;
+} __attribute__((packed));
 
-void gdt_entry_set(size_t index, uint32_t base, uint32_t limit, uint8_t access, uint8_t gran);
+struct gen_seg_desc gdt[GDT_ENTRIES_COUNT];
+
 void gdt_load();
 void gdt_init();
 
 /**
  *  Interrupt Descriptor Table
  */
-#define IDT_ENTRIES_COUNT       (256)
-#define IDT_SEL_KERNEL          (0x8)
-#define IDT_FLAGS_BASE          (0xe)
-#define IDT_ENTRY_DEFAULT_SEL   (IDT_SEL_KERNEL)
-#define IDT_ENTRY_DEFAULT_FLAG  (IDT_FLAGS_BASE | ((0x0 & 0x3) << 4u) | (1u << 7u))
+#define IDT_ENTRIES_COUNT (256)
+#define IDT_CODE_SEGMENT (0x8)
 
-struct idt_entry {
-    uint16_t base_lo;
-    uint16_t selector;
-    uint8_t unused;
-    uint8_t flags;
-    uint16_t base_hi;
-}__attribute__((packed));
+/**
+ * System-segment descriptor types (long mode)
+ * AMD64 APM p.90
+ */
+#define SSDT_INTERRUPT_GATE (0xe)
+#define SSDT_TRAP_GATE (0xf)
 
-struct idtr {
-    uint16_t limit;
-    uint32_t base;
-}__attribute__((packed));
+/**
+ * Interrupt-gate and trap-gate descriptor (long mode)
+ * AMD64 APM p.93
+ */
+struct gate_desc {
+    uint64_t offset_lo : 16;
+    uint64_t selector : 16;
+    uint64_t ist : 3;
+    uint64_t reserved_1 : 5;
+    uint64_t type : 4;
+    uint64_t zero : 1;
+    uint64_t dpl : 2;
+    uint64_t p : 1;
+    uint64_t offset_hi : 48;
+    uint64_t reserved_2 : 32;
+} __attribute__((__packed__));
 
-struct idt_entry idt[IDT_ENTRIES_COUNT];
+struct gate_desc idt[IDT_ENTRIES_COUNT];
 
-void idt_entry_set(size_t index, uint32_t base, uint8_t selector, uint8_t flags);
-void idt_load();
+/**
+ * Register an interrupt handler with address `base`.
+ */
+void set_interrupt_desc(size_t index, uint64_t base);
+void idt_init();
 
 #endif /* __ARGIR__CPU_H */

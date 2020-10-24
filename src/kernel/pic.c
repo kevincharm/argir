@@ -39,6 +39,12 @@ void pic_remap()
     outb(PIC2_PORT_DATA, 0xff);
 }
 
+void pic_enable_only_keyboard()
+{
+    outb(PIC1_PORT_DATA, 0xfd);
+    outb(PIC2_PORT_DATA, 0xff);
+}
+
 void pic_irq_off(unsigned int irq_no)
 {
     uint16_t port = PIC1_PORT_DATA; // IRQ0-IRQ7
