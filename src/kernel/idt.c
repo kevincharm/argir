@@ -34,17 +34,15 @@ void idt_init()
     };
     lidt(&idtr);
 
-    // Check
-    sidt(&idtr);
-    struct gate_desc *entries = (struct gate_desc *)idtr.base;
-    printf("v=%u, base=%u, limit=%u\n", idt, idtr.base, idtr.limit);
-    for (size_t i = 0; i < IDT_ENTRIES_COUNT; i++) {
-        struct gate_desc *entry = &entries[i];
-        // uint64_t isr_addr = (entry->offset_lo) &
-        //                     ((entry->offset_hi << 16u) & 0xffffffffffff0000ll);
-        if (i == 33 || i == 255) {
-            printf("%u, ", entry->offset_lo & 0xffff);
-        }
+    // Check loaded IDTR
+    struct dtr loaded_idtr = {
+        .limit = 0xffff,
+        .base = 0xffffffffffffffffull,
+    };
+    sidt(&loaded_idtr);
+    if (idtr.limit != loaded_idtr.limit || idtr.base != loaded_idtr.base) {
+        printf("Failed to load interrupt descriptor table!\n");
+        __asm__ volatile("hlt");
     }
 
     printf("Loaded interrupt descriptor table.\n");

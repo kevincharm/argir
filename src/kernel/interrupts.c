@@ -32,7 +32,7 @@ void isr_stub_handler(struct interrupt_frame frame)
 void interrupts_init()
 {
     // Intel-reserved interrupts
-    printf("installing ISRs...\n");
+    printf("Installing ISRs...\n");
     IDT_DEFAULT_ISR_HANDLER(0);
     IDT_DEFAULT_ISR_HANDLER(1);
     IDT_DEFAULT_ISR_HANDLER(2);

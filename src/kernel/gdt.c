@@ -86,9 +86,18 @@ void gdt_init()
         .limit = (sizeof(struct gen_seg_desc) * GDT_ENTRIES_COUNT) - 1,
         .base = (uint64_t)&gdt[0],
     };
-
     lgdt(&gdtr);
-    sgdt(&gdtr);
 
-    printf("Loaded global descriptor table. limit=%u\n", gdtr.limit);
+    // Check loaded GDTR
+    struct dtr loaded_gdtr = {
+        .limit = 0xffff,
+        .base = 0xffffffffffffffffull,
+    };
+    sgdt(&loaded_gdtr);
+    if (gdtr.limit != loaded_gdtr.limit || gdtr.base != loaded_gdtr.base) {
+        printf("Failed to load global descriptor table!\n");
+        __asm__ volatile("hlt");
+    }
+
+    printf("Loaded global descriptor table.\n");
 }
