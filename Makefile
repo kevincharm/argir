@@ -90,8 +90,8 @@ print_toolchain:
 _print_toolchain:
 	$(CC) --version
 
-readsec:
+sections:
 	greadelf -S $(ISO_DIR)/boot/argir.bin
 
 objdump:
-	objdump -d $(ISO_DIR)/boot/argir.bin
+	objdump -x $(ISO_DIR)/boot/argir.bin
