@@ -14,9 +14,9 @@ static inline void pic_slave_eoi()
 
 void pic_eoi(unsigned int int_no)
 {
-    // if (int_no >= 0x28) {
-    pic_slave_eoi();
-    // }
+    if (int_no >= 0x28) {
+        pic_slave_eoi();
+    }
 
     pic_master_eoi();
 }
