@@ -59,5 +59,7 @@ void kernel_main()
 
     for (;;) {
         keyboard_main();
+
+        __asm__ volatile("hlt");
     }
 }
