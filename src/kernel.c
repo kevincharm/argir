@@ -1,34 +1,23 @@
+#include "efi.h"
+#include "efilib.h"
 #include <stdint.h>
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <kernel/cpu.h>
-#include <kernel/interrupts.h>
-#include <kernel/terminal.h>
-#include <kernel/keyboard.h>
-#include <kernel/pci.h>
+#include "kernel/cpu.h"
+#include "kernel/interrupts.h"
+#include "kernel/terminal.h"
+#include "kernel/keyboard.h"
+#include "kernel/pci.h"
 
 #ifndef __ARGIR_BUILD_COMMIT__
 #define __ARGIR_BUILD_COMMIT__ "balls"
 #endif
 
-struct pci g_pci;
-
-static void init_pci()
-{
-    struct pci *pci = &g_pci;
-    pci_init(pci);
-    for (int i = 0; i < pci->dev_count; i++) {
-        struct pci_descriptor *p = pci->dev + i;
-        printf("PCI device <vendor: %u, device: %u>\n", p->vendor_id,
-               p->device_id);
-    }
-}
-
 static void print_logo()
 {
-    printf(
-        "\n                                @@\\\n"
+    Print(
+        L"\n                                @@\\\n"
         "                                \\__|\n"
         "   @@@@@@\\   @@@@@@\\   @@@@@@\\  @@\\  @@@@@@\\   @@@@@@\\   @@@@@@@\\\n"
         "   \\____@@\\ @@  __@@\\ @@  __@@\\ @@ |@@  __@@\\ @@  __@@\\ @@  _____|\n"
@@ -43,23 +32,27 @@ static void print_logo()
         "Build " __ARGIR_BUILD_COMMIT__ "\n\n");
 }
 
-void kernel_main()
+EFI_STATUS EFIAPI efi_main(EFI_HANDLE handle, EFI_SYSTEM_TABLE *sys_table)
 {
-    interrupts_disable();
-
-    terminal_init();
+    InitializeLib(handle, sys_table);
     print_logo();
 
-    gdt_init();
-    interrupts_init();
-    keyboard_init();
-    init_pci();
+    interrupts_disable();
 
-    interrupts_enable();
+    // terminal_init();
+
+    gdt_init();
+    // interrupts_init();
+    // keyboard_init();
+    // init_pci();
+
+    // interrupts_enable();
 
     for (;;) {
-        keyboard_main();
+        // keyboard_main();
 
         __asm__ volatile("hlt");
     }
+
+    return EFI_SUCCESS;
 }

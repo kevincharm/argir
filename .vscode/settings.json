@@ -1,0 +1,9 @@
+{
+  "C_Cpp.default.includePath": [
+    "${workspaceFolder}/src/include",
+    "${workspaceFolder}/src/klib/include",
+    "/usr/local/include/efi",
+    "/usr/local/include/efi/protocol",
+    "/usr/local/include/efi/x86_64"
+  ]
+}
