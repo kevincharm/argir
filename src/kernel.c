@@ -44,30 +44,33 @@ static void print_logo()
         "Build " __ARGIR_BUILD_COMMIT__ "\n\n");
 }
 
-void kernel_main(uint32_t mb2_magic, struct mb2_info *mb2_info)
+void kernel_main(uint32_t mb2_magic, uint32_t mb2_info)
 {
-    if (mb2_magic != 0xe85250d6) {
-        /** wat do?! */
-        return;
-    }
-
-    struct mb2_tag *mb2_tag_framebuffer = mb2_find_tag(mb2_info, 8);
-    uint64_t *fb = mb2_tag_framebuffer->framebuffer.framebuffer_addr;
-
     interrupts_disable();
 
-    terminal_init();
-    print_logo();
+    if (mb2_magic != 0x36d76289) {
+        /** wat do?! */
+        __asm__ volatile("mov $0xdeadbeef, %rax\n\t"
+                         "hlt");
+    }
 
-    gdt_init();
-    interrupts_init();
-    keyboard_init();
-    init_pci();
+    // struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
+    // uint64_t *fb = mb2_tag_fb->framebuffer.addr;
 
-    interrupts_enable();
+    // terminal_init(fb, mb2_tag_fb->framebuffer.width,
+    //               mb2_tag_fb->framebuffer.height,
+    //               mb2_tag_fb->framebuffer.pitch);
+    // print_logo();
+
+    // gdt_init();
+    // interrupts_init();
+    // keyboard_init();
+    // init_pci();
+
+    // interrupts_enable();
 
     for (;;) {
-        keyboard_main();
+        // keyboard_main();
 
         __asm__ volatile("hlt");
     }

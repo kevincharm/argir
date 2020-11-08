@@ -8,12 +8,12 @@ struct mb2_tag {
     uint32_t size;
     union {
         struct mb2_tag_fb {
-            uint64_t framebuffer_addr;
-            uint32_t framebuffer_pitch;
-            uint32_t framebuffer_width;
-            uint32_t framebuffer_height;
-            uint8_t framebuffer_bpp;
-            uint8_t framebuffer_type;
+            uint64_t addr;
+            uint32_t pitch;
+            uint32_t width;
+            uint32_t height;
+            uint8_t bpp;
+            uint8_t fb_type;
             uint8_t reserved;
         } __attribute__((packed)) framebuffer;
     };

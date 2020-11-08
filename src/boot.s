@@ -6,7 +6,7 @@
 .set MAGIC, (0xe85250d6)
 .set CHECKSUM, -(MAGIC + FLAGS + (mb2_header_end - mb2_header_start))
 .section .multiboot
-.align 4
+.align 8
 mb2_header_start:
     # Fields
     .long MAGIC
@@ -22,12 +22,13 @@ mb2_tag_fb_start:
     .long 1920                      # width
     .long 1080                      # height
     .long 32                        # depth (bits per pixel)
-.align 8
 mb2_tag_fb_end:
+.align 8
+mb2_tag_null_start:
     # Empty tag, 8-byte aligned
     .short 0
     .short 0
-    .long mb2_header_end - mb2_tag_fb_end
+    .long mb2_header_end - mb2_tag_null_start
 mb2_header_end:
 
 ###############################################################################
@@ -77,6 +78,11 @@ p_gdt:
 .type _start, @function
 _start:
     mov $stack_top, %esp
+
+    # Reset EFLAGS
+    pushl $0
+    popf
+
     # %ebx contains the physical address of MB2 info structure.
     push %ebx
     # %eax contains MB2 magic number

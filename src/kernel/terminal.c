@@ -1,11 +1,11 @@
 #include <string.h>
 #include <kernel/terminal.h>
 
-#define VGA_TEXT_MODE_ADDR ((volatile uint16_t *)0xb8000)
-#define VGA_TEXT_MODE_WIDTH (80u)
-#define VGA_TEXT_MODE_HEIGHT (25u)
-#define VGA_COLOUR_BLACK (0)
-#define VGA_COLOUR_WHITE (15)
+extern uint64_t KFONT_VGA_LEN;
+extern uint64_t KFONT_VGA_WIDTH;
+extern uint64_t KFONT_VGA_HEIGHT;
+extern uint8_t KFONT_VGA[];
+#define GLYPH_WIDTH (KFONT_VGA_LEN / KFONT_VGA_WIDTH)
 
 struct terminal {
     size_t row;
@@ -13,7 +13,9 @@ struct terminal {
     size_t width;
     size_t height;
     uint8_t colour;
-    volatile uint16_t *buffer;
+    /** Framebuffer */
+    uint64_t *fb;
+    size_t fb_pitch;
 };
 
 static struct terminal term0;
@@ -31,20 +33,35 @@ static inline void terminal_vga_colour_set(uint8_t fg, uint8_t bg)
 
 static inline void vga_text_set(size_t x, size_t y, unsigned char c)
 {
-    size_t i = (y * term->width) + x;
-    term->buffer[i] = ((uint16_t)(term->colour) << 8u) | c;
+    // term->buffer[i] = ((uint16_t)(term->colour) << 8u) | c;
+    // Find the glyph offset in the font bitmap
+    size_t glyph_x_off = (c - 0x20) * GLYPH_WIDTH;
+    // Copy pixels from glyph to framebuffer
+    for (size_t j = 0; j < KFONT_VGA_HEIGHT; j++) {
+        for (size_t i = 0; i < GLYPH_WIDTH; i++) {
+            size_t index = KFONT_VGA_WIDTH * j + glyph_x_off + i;
+            uint32_t argb = ((KFONT_VGA[index] << 16) & 0xff0000) |
+                            ((KFONT_VGA[index + 1] << 8) & 0xff00) |
+                            KFONT_VGA[index + 2];
+
+            // Calculate framebuffer offset, i.e. where to copy pixels to
+            size_t fb_off = term->fb_pitch * (KFONT_VGA_HEIGHT * y + j) +
+                            (GLYPH_WIDTH * x + i) * 4;
+            *((uint32_t *)(term->fb + fb_off)) = argb;
+        }
+    }
 }
 
 void terminal_scroll_up(size_t n)
 {
-    size_t total = term->width * term->height;
-    size_t sub = n * term->width;
-    for (size_t i = sub; i < total; i++) {
-        term->buffer[i - sub] = term->buffer[i];
-    }
-    for (size_t i = total - sub; i < total; i++) {
-        term->buffer[i] = ' ';
-    }
+    // size_t total = term->width * term->height;
+    // size_t sub = n * term->width;
+    // for (size_t i = sub; i < total; i++) {
+    //     term->buffer[i - sub] = term->buffer[i];
+    // }
+    // for (size_t i = total - sub; i < total; i++) {
+    //     term->buffer[i] = ' ';
+    // }
 }
 
 void terminal_write_char(const char c)
@@ -95,13 +112,14 @@ void terminal_write(const char *str)
     }
 }
 
-void terminal_init()
+void terminal_init(uint64_t *framebuffer, size_t screen_width,
+                   size_t screen_height, size_t fb_scanline)
 {
     term->row = 0;
     term->col = 0;
-    term->width = VGA_TEXT_MODE_WIDTH;
-    term->height = VGA_TEXT_MODE_HEIGHT;
-    term->buffer = VGA_TEXT_MODE_ADDR;
-    terminal_vga_colour_set(VGA_COLOUR_WHITE, VGA_COLOUR_BLACK);
-    terminal_clear();
+    term->width = screen_width / GLYPH_WIDTH;
+    term->height = screen_height / KFONT_VGA_HEIGHT;
+    term->fb = framebuffer;
+    term->fb_pitch = fb_scanline;
+    // terminal_clear();
 }
