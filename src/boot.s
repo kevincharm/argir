@@ -13,10 +13,21 @@ mb2_header_start:
     .long FLAGS
     .long mb2_header_end - mb2_header_start
     .long CHECKSUM
+.align 8
+mb2_tag_fb_start:
+    # Framebuffer tag (MB2 Spec, Section 3.1.10)
+    .short 5
+    .short 0
+    .long mb2_tag_fb_end - mb2_tag_fb_start
+    .long 1920                      # width
+    .long 1080                      # height
+    .long 32                        # depth (bits per pixel)
+.align 8
+mb2_tag_fb_end:
     # Empty tag, 8-byte aligned
     .short 0
     .short 0
-    .long 0x8
+    .long mb2_header_end - mb2_tag_fb_end
 mb2_header_end:
 
 ###############################################################################
@@ -52,8 +63,8 @@ gdt_data_desc:
     .quad 0x0000920000000000        # kernel data descriptor rw-
 # GDT struct
 p_gdt:
-    .short (p_gdt - gdt - 1)    # limit
-    .quad (gdt)                   # base
+    .short (p_gdt - gdt - 1)        # limit
+    .quad (gdt)                     # base
 # Segment pointers
 .set gdt_code_seg, gdt_code_desc - gdt
 .set gdt_data_seg, gdt_data_desc - gdt
@@ -68,6 +79,8 @@ _start:
     mov $stack_top, %esp
     # %ebx contains the physical address of MB2 info structure.
     push %ebx
+    # %eax contains MB2 magic number
+    push %eax
 
     # TODO: First we should:
     # 1. Check that Multiboot2 dropped us here.
@@ -154,7 +167,6 @@ pt_loop:
     mov %ax, %es
 
     # Here we go bois.
-    pop %ebx
     ljmp $gdt_code_seg, $kernel_main
 
     cli

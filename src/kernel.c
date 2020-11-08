@@ -2,11 +2,12 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <kernel/cpu.h>
-#include <kernel/interrupts.h>
-#include <kernel/terminal.h>
-#include <kernel/keyboard.h>
-#include <kernel/pci.h>
+#include "kernel/mb2.h"
+#include "kernel/cpu.h"
+#include "kernel/interrupts.h"
+#include "kernel/terminal.h"
+#include "kernel/keyboard.h"
+#include "kernel/pci.h"
 
 #ifndef __ARGIR_BUILD_COMMIT__
 #define __ARGIR_BUILD_COMMIT__ "balls"
@@ -43,8 +44,16 @@ static void print_logo()
         "Build " __ARGIR_BUILD_COMMIT__ "\n\n");
 }
 
-void kernel_main()
+void kernel_main(uint32_t mb2_magic, struct mb2_info *mb2_info)
 {
+    if (mb2_magic != 0xe85250d6) {
+        /** wat do?! */
+        return;
+    }
+
+    struct mb2_tag *mb2_tag_framebuffer = mb2_find_tag(mb2_info, 8);
+    uint64_t *fb = mb2_tag_framebuffer->framebuffer.framebuffer_addr;
+
     interrupts_disable();
 
     terminal_init();

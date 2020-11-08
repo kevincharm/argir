@@ -25,6 +25,7 @@ SRC_DIR=./src
 KERNEL_INCLUDE=$(SRC_DIR)/include
 KERNEL_OBJS=\
 	$(SRC_DIR)/boot.o \
+	$(SRC_DIR)/mb2.o \
 	$(SRC_DIR)/kernel/gdt.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
