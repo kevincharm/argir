@@ -14,6 +14,8 @@
 #endif
 
 struct pci g_pci;
+uint32_t mb2_magic;
+uint32_t mb2_info;
 
 static void init_pci()
 {
@@ -44,7 +46,7 @@ static void print_logo()
         "Build " __ARGIR_BUILD_COMMIT__ "\n\n");
 }
 
-void kernel_main(uint32_t mb2_magic, uint32_t mb2_info)
+void kernel_main()
 {
     interrupts_disable();
 

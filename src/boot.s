@@ -84,9 +84,9 @@ _start:
     popf
 
     # %ebx contains the physical address of MB2 info structure.
-    push %ebx
+    mov %ebx, (mb2_info)
     # %eax contains MB2 magic number
-    push %eax
+    mov %eax, (mb2_magic)
 
     # TODO: First we should:
     # 1. Check that Multiboot2 dropped us here.

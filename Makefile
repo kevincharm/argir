@@ -13,7 +13,7 @@ DOCKER_SH=docker run -it --rm \
 AS=x86_64-elf-as
 CC=x86_64-elf-gcc
 LD=x86_64-elf-ld
-CFLAGS=-m64 -std=gnu11 -ffreestanding -O2 -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone \
+CFLAGS=-m64 -std=gnu11 -ffreestanding -fno-stack-protector -O2 -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone \
 	-mgeneral-regs-only -mno-mmx -mno-sse -mno-sse2 -mno-avx
 
 # Build info
