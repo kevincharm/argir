@@ -14,7 +14,7 @@ struct terminal {
     size_t height;
     uint8_t colour;
     /** Framebuffer */
-    uint64_t *fb;
+    uint8_t *fb;
     size_t fb_pitch;
 };
 

@@ -56,30 +56,23 @@ void kernel_main()
                          "hlt");
     }
 
-    // Test green screen
     struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
     uint8_t *fb = ((void *)mb2_tag_fb->framebuffer.addr);
-    for (size_t i = 0; i < mb2_tag_fb->framebuffer.width; i++) {
-        for (size_t j = 0; j < mb2_tag_fb->framebuffer.height; j++) {
-            *((uint32_t *)(fb + mb2_tag_fb->framebuffer.pitch * j + i * 4)) =
-                0x0000ff00;
-        }
-    }
 
-    // terminal_init(fb, mb2_tag_fb->framebuffer.width,
-    //               mb2_tag_fb->framebuffer.height,
-    //               mb2_tag_fb->framebuffer.pitch);
-    // print_logo();
+    terminal_init(fb, mb2_tag_fb->framebuffer.width,
+                  mb2_tag_fb->framebuffer.height,
+                  mb2_tag_fb->framebuffer.pitch);
+    print_logo();
 
-    // gdt_init();
-    // interrupts_init();
-    // keyboard_init();
-    // init_pci();
+    gdt_init();
+    interrupts_init();
+    keyboard_init();
+    init_pci();
 
-    // interrupts_enable();
+    interrupts_enable();
 
     for (;;) {
-        // keyboard_main();
+        keyboard_main();
 
         __asm__ volatile("hlt");
     }
