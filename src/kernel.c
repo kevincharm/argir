@@ -56,8 +56,13 @@ void kernel_main()
                          "hlt");
     }
 
-    // struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
-    // uint64_t *fb = mb2_tag_fb->framebuffer.addr;
+    struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
+    uint32_t *fb = ((void *)mb2_tag_fb->framebuffer.addr);
+    for (size_t i = 0; i < 1920; i++) {
+        for (size_t j = 0; j < 1080; j++) {
+            fb[1080 * j + i] = 0x00ff0000;
+        }
+    }
 
     // terminal_init(fb, mb2_tag_fb->framebuffer.width,
     //               mb2_tag_fb->framebuffer.height,
