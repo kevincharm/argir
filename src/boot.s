@@ -234,18 +234,6 @@ _start:
     or $(1 << 31), %eax
     mov %eax, %cr0
 
-//     # Framebuffer test
-//     mov $0, %ecx
-//     mov $0x00ff0000, %edx       # ARGB
-// 1:
-//     mov $0xfd000000, %edi       # framebuffer addr
-//     mov %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
-//     inc %ecx
-//     inc %edx
-//     cmp $(1920 * 1080), %ecx
-//     jne 1b
-    // hlt
-
     # Load the GDT.
     lgdt (p_gdt)
 
