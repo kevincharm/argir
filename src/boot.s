@@ -2,34 +2,55 @@
 #   Multiboot2 Header                                                         #
 #   Spec: https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html  #
 ###############################################################################
+.set SCREEN_WIDTH, (800)
+.set SCREEN_HEIGHT, (600)
 .set FLAGS, (0)
 .set MAGIC, (0xe85250d6)
 .set CHECKSUM, -(MAGIC + FLAGS + (mb2_header_end - mb2_header_start))
 .section .multiboot
-.align 4
+.align 8
 mb2_header_start:
     # Fields
     .long MAGIC
     .long FLAGS
     .long mb2_header_end - mb2_header_start
     .long CHECKSUM
+.align 8
+mb2_tag_fb_start:
+    # Framebuffer tag (MB2 Spec, Section 3.1.10)
+    .short 5
+    .short 0
+    .long mb2_tag_fb_end - mb2_tag_fb_start
+    .long SCREEN_WIDTH
+    .long SCREEN_HEIGHT
+    .long 32                        # depth (bits per pixel)
+mb2_tag_fb_end:
+.align 8
+mb2_tag_null_start:
     # Empty tag, 8-byte aligned
     .short 0
     .short 0
-    .long 0x8
+    .long mb2_header_end - mb2_tag_null_start
 mb2_header_end:
 
 ###############################################################################
 #   Protected mode -> long mode                                               #
 ###############################################################################
-# Set aside space for page tables (16KiB) and stack (16KiB)
+# Set aside space for page tables (4KB each) and stack (16KiB)
 .section .bss
 .align 0x1000
 pml4:
     .skip 0x1000
 pdpt:
     .skip 0x1000
-pd:
+# Each PD points to a PT. Each PT holds 512 entries * 2M pages = 1G of memory mapped.
+pd0:
+    .skip 0x1000
+pd1:
+    .skip 0x1000
+pd2:
+    .skip 0x1000
+pd3:
     .skip 0x1000
 .align 4
 stack_bottom:
@@ -52,8 +73,8 @@ gdt_data_desc:
     .quad 0x0000920000000000        # kernel data descriptor rw-
 # GDT struct
 p_gdt:
-    .short (p_gdt - gdt - 1)    # limit
-    .quad (gdt)                   # base
+    .short (p_gdt - gdt - 1)        # limit
+    .quad (gdt)                     # base
 # Segment pointers
 .set gdt_code_seg, gdt_code_desc - gdt
 .set gdt_data_seg, gdt_data_desc - gdt
@@ -66,13 +87,15 @@ p_gdt:
 .type _start, @function
 _start:
     mov $stack_top, %esp
-    # %ebx contains the physical address of MB2 info structure.
-    push %ebx
 
-    # TODO: First we should:
-    # 1. Check that Multiboot2 dropped us here.
-    # 2. Check that long mode is actually available.
-    # But it's 2020 so we just yolo it.
+    # Reset EFLAGS
+    pushl $0
+    popf
+
+    # %ebx contains the physical address of MB2 info structure.
+    mov %ebx, (mb2_info)
+    # %eax contains MB2 magic number
+    mov %eax, (mb2_magic)
 
     # Now we setup paging.
     mov $pml4, %edi
@@ -83,13 +106,8 @@ _start:
     cld
     rep stosl
 
-    # Now we want to point PML4->PDPT->PD->PT
+    # Now we want to point PML4->PDPT->PD
     # Build PML4 (Page Map Level 4)
-    # First PML4 entry lives at es:di. PML4 table is 16KiB long.
-    # 1. Load the first PDPT entry into eax,
-    # 2. Set page present and writable flag.
-    # 3. Load eax into es:di.
-    # 4. Repeat for PDPT and PD.
     mov $pdpt, %eax
     # flags = present | writable
     or $0x3, %eax
@@ -100,21 +118,95 @@ _start:
     or $0x3, %eax
     mov %eax, (pml4)
 
-    # Build PD (Page Directory, 2MiB)
-    mov $pd, %eax
+    ### Build PD0 (0 - 1G) ###
+    mov $pd0, %eax
     or $0x3, %eax
-    mov %eax, (pdpt)
-
+    mov %eax, (pdpt)        # Point PDPT0 entry -> PD0
     # Map page table entries (512 * 2M)
     mov $0, %ecx
-pt_loop:
+1:
+    mov $0x200000, %eax     # Each huge page is 2M
+    mul %ecx                # Multiply by counter to calculate page offset
+    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
+    mov %eax, pd0(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    inc %ecx
+    cmp $512, %ecx
+    jb 1b                   # Loop until 512 entries filled for this PD
+    ### PD0 sanity check - total mapped should be 1G ###
     mov $0x200000, %eax
     mul %ecx
-    or $0b10000011, %eax
-    mov %eax, pd(,%ecx,)
-    add $8, %ecx
-    cmp $(512 * 8), %ecx
-    jb pt_loop
+    # assert eax == 0x40000000 (1G)
+    cmp $0x40000000, %eax
+    jne boot_err
+
+    ### Build PD1 (1G - 2G) ###
+    mov $pd1, %eax
+    or $0x3, %eax
+    mov %eax, (pdpt + 8)    # Point PDPT1 entry -> PD1 (each PDPTE is 8B)
+    # Map page table entries (512 * 2M)
+    mov $0, %ecx
+1:
+    mov $0x200000, %eax     # Each huge page is 2M
+    mul %ecx                # Multiply by counter to calculate local page offset
+    add $0x40000000, %eax   # This PD starts at 1G
+    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
+    mov %eax, pd1(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    inc %ecx
+    cmp $512, %ecx    # Counter is carried over from last PD
+    jb 1b                   # Loop until 512 entries filled for this PD
+    ### PD1 sanity check - total mapped should be 2G ###
+    mov $0x200000, %eax
+    mul %ecx
+    add $0x40000000, %eax   # This PD starts at 1G
+    # assert eax == 0x80000000 (2G)
+    cmp $0x80000000, %eax
+    jne boot_err
+
+    ### Build PD2 (2G - 3G) ###
+    mov $pd2, %eax
+    or $0x3, %eax
+    mov %eax, (pdpt + 16)    # Point PDPT2 entry -> PD2
+    # Map page table entries (512 * 2M)
+    mov $0, %ecx
+1:
+    mov $0x200000, %eax     # Each huge page is 2M
+    mul %ecx                # Multiply by counter to calculate page offset
+    add $0x80000000, %eax   # This PD starts at 2G
+    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
+    mov %eax, pd2(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    inc %ecx
+    cmp $512, %ecx
+    jb 1b                   # Loop until 512 entries filled for this PD
+    ### PD2 sanity check - total mapped should be 3G ###
+    mov $0x200000, %eax
+    mul %ecx
+    add $0x80000000, %eax   # This PD starts at 1G
+    # assert eax == 0xc0000000 (3G)
+    cmp $0xc0000000, %eax
+    jne boot_err
+
+    ### Build PD3 (3G - 4G) ###
+    mov $pd3, %eax
+    or $0x3, %eax
+    mov %eax, (pdpt + 24)    # Point PDPT3 entry -> PD3
+    # Map page table entries (512 * 2M)
+    mov $0, %ecx
+1:
+    mov $0x200000, %eax     # Each huge page is 2M
+    mul %ecx                # Multiply by counter to calculate page offset
+    add $0xc0000000, %eax   # This PD starts at 3G
+    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
+    mov %eax, pd3(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    inc %ecx
+    cmp $512, %ecx
+    jb 1b                   # Loop until 512 entries filled for this PD
+    ### PD3 sanity check - total mapped should be 4G ###
+    mov $0x200000, %eax
+    mul %ecx
+    add $0xc0000000, %eax   # This PD starts at 3G
+    # assert eax == 0x100000000 (4G)
+    cmp $0x100000000, %eax
+    jne boot_err
 
     # Load empty IDT
     lidt (empty_idt)
@@ -154,7 +246,6 @@ pt_loop:
     mov %ax, %es
 
     # Here we go bois.
-    pop %ebx
     ljmp $gdt_code_seg, $kernel_main
 
     cli
@@ -162,9 +253,13 @@ pt_loop:
     jmp 1b
 
 boot_err:
-    movl $0x1f421f44, (0xb8000)
-    movl $0x1f3d1f47, (0xb8004)
-    and $0x000000ff, %eax
-    or $0x00000f00, %eax
-    movl %eax, (0xb8008)
+    # RSOD
+    mov $0, %ecx
+    mov $0x00ff0000, %edx       # ARGB
+1:
+    mov $0xfd000000, %edi       # framebuffer addr
+    mov %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
+    inc %ecx
+    cmp $(SCREEN_WIDTH * SCREEN_HEIGHT), %ecx
+    jne 1b
     hlt

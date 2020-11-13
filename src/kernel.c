@@ -2,17 +2,20 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <kernel/cpu.h>
-#include <kernel/interrupts.h>
-#include <kernel/terminal.h>
-#include <kernel/keyboard.h>
-#include <kernel/pci.h>
+#include "kernel/mb2.h"
+#include "kernel/cpu.h"
+#include "kernel/interrupts.h"
+#include "kernel/terminal.h"
+#include "kernel/keyboard.h"
+#include "kernel/pci.h"
 
 #ifndef __ARGIR_BUILD_COMMIT__
 #define __ARGIR_BUILD_COMMIT__ "balls"
 #endif
 
 struct pci g_pci;
+uint32_t mb2_magic;
+uint32_t mb2_info;
 
 static void init_pci()
 {
@@ -47,7 +50,18 @@ void kernel_main()
 {
     interrupts_disable();
 
-    terminal_init();
+    if (mb2_magic != 0x36d76289) {
+        /** wat do?! */
+        __asm__ volatile("mov $0xdeadbeef, %rax\n\t"
+                         "hlt");
+    }
+
+    struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
+    uint8_t *fb = ((void *)mb2_tag_fb->framebuffer.addr);
+
+    terminal_init(fb, mb2_tag_fb->framebuffer.width,
+                  mb2_tag_fb->framebuffer.height,
+                  mb2_tag_fb->framebuffer.pitch);
     print_logo();
 
     gdt_init();

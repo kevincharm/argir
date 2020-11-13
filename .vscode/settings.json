@@ -1,0 +1,8 @@
+{
+  "files.exclude": {
+    "**/.git": true,
+    "**/.DS_Store": true,
+    "**/*.o": true
+  },
+  "C_Cpp.default.includePath": ["src/include", "src/klib/include"]
+}
