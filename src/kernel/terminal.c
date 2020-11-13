@@ -15,6 +15,8 @@ struct terminal {
     uint8_t colour;
     /** Framebuffer */
     uint8_t *fb;
+    size_t fb_width;
+    size_t fb_height;
     size_t fb_pitch;
 };
 
@@ -54,14 +56,14 @@ static inline void vga_text_set(size_t x, size_t y, unsigned char c)
 
 void terminal_scroll_up(size_t n)
 {
-    // size_t total = term->width * term->height;
-    // size_t sub = n * term->width;
-    // for (size_t i = sub; i < total; i++) {
-    //     term->buffer[i - sub] = term->buffer[i];
-    // }
-    // for (size_t i = total - sub; i < total; i++) {
-    //     term->buffer[i] = ' ';
-    // }
+    size_t total = term->fb_pitch * term->fb_height;
+    size_t sub = KFONT_VGA_HEIGHT * n * term->fb_pitch;
+    for (size_t i = sub; i < total; i++) {
+        term->fb[i - sub] = term->fb[i];
+    }
+    for (size_t i = total - sub; i < total; i++) {
+        term->fb[i] = 0;
+    }
 }
 
 void terminal_write_char(const char c)
@@ -120,6 +122,8 @@ void terminal_init(uint64_t *framebuffer, size_t screen_width,
     term->width = screen_width / GLYPH_WIDTH;
     term->height = screen_height / KFONT_VGA_HEIGHT;
     term->fb = framebuffer;
+    term->fb_width = screen_width;
+    term->fb_height = screen_height;
     term->fb_pitch = fb_scanline;
-    // terminal_clear();
+    terminal_clear();
 }
