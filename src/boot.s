@@ -130,7 +130,7 @@ _start:
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
     mov %eax, pd0(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
-    cmp $(512), %ecx
+    cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
     ### PD0 sanity check - total mapped should be 1G ###
     mov $0x200000, %eax
@@ -147,15 +147,17 @@ _start:
     mov $0, %ecx
 1:
     mov $0x200000, %eax     # Each huge page is 2M
-    mul %ecx                # Multiply by counter to calculate page offset
+    mul %ecx                # Multiply by counter to calculate local page offset
+    add $0x40000000, %eax   # This PD starts at 1G
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
     mov %eax, pd1(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
-    cmp $(2 * 512), %ecx    # Counter is carried over from last PD
+    cmp $512, %ecx    # Counter is carried over from last PD
     jb 1b                   # Loop until 512 entries filled for this PD
     ### PD1 sanity check - total mapped should be 2G ###
     mov $0x200000, %eax
     mul %ecx
+    add $0x40000000, %eax   # This PD starts at 1G
     # assert eax == 0x80000000 (2G)
     cmp $0x80000000, %eax
     jne boot_err
@@ -169,14 +171,16 @@ _start:
 1:
     mov $0x200000, %eax     # Each huge page is 2M
     mul %ecx                # Multiply by counter to calculate page offset
+    add $0x80000000, %eax   # This PD starts at 2G
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
     mov %eax, pd2(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
-    cmp $(3 * 512), %ecx
+    cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
     ### PD2 sanity check - total mapped should be 3G ###
     mov $0x200000, %eax
     mul %ecx
+    add $0x80000000, %eax   # This PD starts at 1G
     # assert eax == 0xc0000000 (3G)
     cmp $0xc0000000, %eax
     jne boot_err
@@ -190,14 +194,16 @@ _start:
 1:
     mov $0x200000, %eax     # Each huge page is 2M
     mul %ecx                # Multiply by counter to calculate page offset
+    add $0xc0000000, %eax   # This PD starts at 3G
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
     mov %eax, pd3(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
-    cmp $(4 * 512), %ecx
+    cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
     ### PD3 sanity check - total mapped should be 4G ###
     mov $0x200000, %eax
     mul %ecx
+    add $0xc0000000, %eax   # This PD starts at 3G
     # assert eax == 0x100000000 (4G)
     cmp $0x100000000, %eax
     jne boot_err
@@ -266,6 +272,6 @@ boot_err:
     mov $0xfd000000, %edi       # framebuffer addr
     mov %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
     inc %ecx
-    cmp $(1920 * 1080), %ecx
+    cmp $(SCREEN_WIDTH * SCREEN_HEIGHT), %ecx
     jne 1b
     hlt
