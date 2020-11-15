@@ -5,11 +5,11 @@ ENTRY(_start)
 /** Leave 2M for bootloader */
 KERNEL_LMA = 0x200000;
 /** Kernel will live at -2G + 2M */
-KERNEL_VMA = 0xffffffff80000000 + KERNEL_LMA;
+KERNEL_VMA = 0xffffffff80000000;
 
 SECTIONS
 {
-    . = KERNEL_VMA;
+    . = KERNEL_VMA + KERNEL_LMA;
 
     _kernel_start = .;
 

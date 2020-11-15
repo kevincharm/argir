@@ -1,5 +1,5 @@
 .set KERNEL_LMA, (0x200000)
-.set KERNEL_VMA, (0xffffffff80000000 + KERNEL_LMA)
+.set KERNEL_VMA, (0xffffffff80000000)
 
 ###############################################################################
 #   Multiboot2 Header                                                         #
@@ -267,12 +267,13 @@ boot_err:
 
 .code64
 _start64:
-    movabsq $(_start64_higherhalf - KERNEL_LMA), %rax
+    movabsq $_start64_higherhalf, %rax
     jmp *%rax
 
 _start64_higherhalf:
     mov $KERNEL_VMA, %rax
     add %rax, %rsp              # Adjust stack pointer to higher half
+    mov $stack_bottom, %rbp
 
     # Invalidate paging
     // movq $0, (pml4)
