@@ -42,7 +42,8 @@ mb2_header_end:
 # Set aside space for page tables (4KB each) and stack (16KiB)
 .section .bss
 .align 0x1000
-# Identity mapped level 4 paging, mirrored at -2G
+# Identity-mapped paging for first 4G of physical memory.
+# Bottom 2G is also duplicately mapped at -2G (higher-half).
 pml4:
     .skip 0x1000
 pdpt:
@@ -83,9 +84,6 @@ gdt_end:
 p_gdt32:
     .short (gdt_end - gdt - 1)      # limit
     .long gdt - KERNEL_VMA          # base
-p_gdt64:
-    .short (gdt_end - gdt - 1)      # limit
-    .quad gdt                       # base
 # Segment pointers
 .set gdt_code_seg, gdt_code_desc - gdt
 .set gdt_data_seg, gdt_data_desc - gdt
@@ -133,17 +131,17 @@ _start:
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
-    mov $0x200000, %eax     # Each huge page is 2M
-    mul %ecx                # Multiply by counter to calculate page offset
-    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, (pd0 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov $0x200000, %eax                         # Each huge page is 2M
+    mul %ecx                                    # Multiply by counter to calculate page offset
+    or $0b10000011, %eax                        # Set flags PRESENT | WRITABLE
+    mov %eax, (pd0 - KERNEL_VMA)(,%ecx,8)       # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
-    jb 1b                   # Loop until 512 entries filled for this PD
+    jb 1b                                       # Loop until 512 entries filled for this PD
     ### PD0 sanity check - total mapped should be 1G ###
     mov $0x200000, %eax
     mul %ecx
-    # assert eax == 0x40000000 (1G)
+    ### assert eax == 0x40000000 (1G)
     cmp $0x40000000, %eax
     jne boot_err
 
@@ -155,66 +153,66 @@ _start:
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
-    mov $0x200000, %eax     # Each huge page is 2M
-    mul %ecx                # Multiply by counter to calculate local page offset
-    add $0x40000000, %eax   # This PD starts at 1G
-    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, (pd1 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov $0x200000, %eax                         # Each huge page is 2M
+    mul %ecx                                    # Multiply by counter to calculate local page offset
+    add $0x40000000, %eax                       # This PD starts at 1G
+    or $0b10000011, %eax                        # Set flags PRESENT | WRITABLE
+    mov %eax, (pd1 - KERNEL_VMA)(,%ecx,8)       # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
-    jb 1b                   # Loop until 512 entries filled for this PD
+    jb 1b                                       # Loop until 512 entries filled for this PD
     ### PD1 sanity check - total mapped should be 2G ###
     mov $0x200000, %eax
     mul %ecx
-    add $0x40000000, %eax   # This PD starts at 1G
-    # assert eax == 0x80000000 (2G)
+    add $0x40000000, %eax                       # This PD starts at 1G
+    ### assert eax == 0x80000000 (2G)
     cmp $0x80000000, %eax
     jne boot_err
 
     ### Build PD2 (2G - 3G) ###
     mov $(pd2 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 16 - KERNEL_VMA)    # Point PDPT2 entry -> PD2
+    mov %eax, (pdpt + 16 - KERNEL_VMA)          # Point PDPT2 entry -> PD2
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
-    mov $0x200000, %eax     # Each huge page is 2M
-    mul %ecx                # Multiply by counter to calculate page offset
-    add $0x80000000, %eax   # This PD starts at 2G
-    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, (pd2 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov $0x200000, %eax                         # Each huge page is 2M
+    mul %ecx                                    # Multiply by counter to calculate page offset
+    add $0x80000000, %eax                       # This PD starts at 2G
+    or $0b10000011, %eax                        # Set flags PRESENT | WRITABLE
+    mov %eax, (pd2 - KERNEL_VMA)(,%ecx,8)       # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
-    jb 1b                   # Loop until 512 entries filled for this PD
+    jb 1b                                       # Loop until 512 entries filled for this PD
     ### PD2 sanity check - total mapped should be 3G ###
     mov $0x200000, %eax
     mul %ecx
-    add $0x80000000, %eax   # This PD starts at 2G
-    # assert eax == 0xc0000000 (3G)
+    add $0x80000000, %eax                       # This PD starts at 2G
+    ### assert eax == 0xc0000000 (3G)
     cmp $0xc0000000, %eax
     jne boot_err
 
     ### Build PD3 (3G - 4G) ###
     mov $(pd3 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 24 - KERNEL_VMA)    # Point PDPT3 entry -> PD3
+    mov %eax, (pdpt + 24 - KERNEL_VMA)          # Point PDPT3 entry -> PD3
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
-    mov $0x200000, %eax     # Each huge page is 2M
-    mul %ecx                # Multiply by counter to calculate page offset
-    add $0xc0000000, %eax   # This PD starts at 3G
-    or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, (pd3 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov $0x200000, %eax                         # Each huge page is 2M
+    mul %ecx                                    # Multiply by counter to calculate page offset
+    add $0xc0000000, %eax                       # This PD starts at 3G
+    or $0b10000011, %eax                        # Set flags PRESENT | WRITABLE
+    mov %eax, (pd3 - KERNEL_VMA)(,%ecx,8)       # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
-    jb 1b                   # Loop until 512 entries filled for this PD
+    jb 1b                                       # Loop until 512 entries filled for this PD
     ### PD3 sanity check - total mapped should be 4G ###
     mov $0x200000, %eax
     mul %ecx
-    add $0xc0000000, %eax   # This PD starts at 3G
-    # assert eax == 0x100000000 (4G)
-    cmp $0x100000000, %eax  # Yes, this is an overflow.
+    add $0xc0000000, %eax                       # This PD starts at 3G
+    ### assert eax == 0x100000000 (4G)
+    cmp $0x100000000, %eax                      # Yes, this is an overflow.
     jne boot_err
 
     # Load empty IDT
@@ -256,10 +254,10 @@ _start:
 boot_err:
     # RSOD
     mov $0, %ecx
-    mov $0x00ff0000, %edx       # ARGB
+    mov $0x00ff0000, %edx                       # ARGB
 1:
-    mov $0xfd000000, %edi       # framebuffer addr
-    mov %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
+    mov $0xfd000000, %edi                       # framebuffer addr
+    mov %edx, (%edi, %ecx, 4)                   # draw argb[%edx] to framebuffer[%edi]
     inc %ecx
     cmp $(SCREEN_WIDTH * SCREEN_HEIGHT), %ecx
     jne 1b
@@ -272,7 +270,7 @@ _start64:
 
 _start64_higherhalf:
     mov $KERNEL_VMA, %rax
-    add %rax, %rsp              # Adjust stack pointer to higher half
+    add %rax, %rsp                              # Adjust stack pointer to higher half
     mov $stack_bottom, %rbp
 
     # Invalidate paging
@@ -289,10 +287,10 @@ boot64_err:
     # RSOD
     mov $0xdeadbeefcafebabe, %rax
     movl $0, %ecx
-    movl $0x00ff0000, %edx       # ARGB
+    movl $0x00ff0000, %edx                      # ARGB
 1:
-    movl $0xfd000000, %edi       # framebuffer addr
-    movl %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
+    movl $0xfd000000, %edi                      # framebuffer addr
+    movl %edx, (%edi, %ecx, 4)                  # draw argb[%edx] to framebuffer[%edi]
     inc %ecx
     cmpl $(SCREEN_WIDTH * SCREEN_HEIGHT), %ecx
     jne 1b
