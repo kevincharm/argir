@@ -17,9 +17,6 @@ struct pci g_pci;
 uint32_t mb2_magic;
 uint32_t mb2_info;
 
-#define KERNEL_LMA (0x200000)
-#define KERNEL_VMA (0xffffffff80000000)
-
 static void init_pci()
 {
     struct pci *pci = &g_pci;
