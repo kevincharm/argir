@@ -1,3 +1,6 @@
+.set KERNEL_LMA, (0x200000)
+.set KERNEL_VMA, (0xffffffff80000000 + KERNEL_LMA)
+
 ###############################################################################
 #   Multiboot2 Header                                                         #
 #   Spec: https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html  #
@@ -39,11 +42,14 @@ mb2_header_end:
 # Set aside space for page tables (4KB each) and stack (16KiB)
 .section .bss
 .align 0x1000
+# Identity mapped level 4 paging, mirrored at -2G
 pml4:
     .skip 0x1000
 pdpt:
     .skip 0x1000
-# Each PD points to a PT. Each PT holds 512 entries * 2M pages = 1G of memory mapped.
+# Since we're using hugepages, each PD entry (8B) points to a 2M page.
+# -> Each PD holds 0x1000 / 8 = 512 entries.
+# -> Each PD maps 512 * 2M = 2^30 = 1GiB of memory.
 pd0:
     .skip 0x1000
 pd1:
@@ -61,9 +67,10 @@ stack_top:
 .align 4
 empty_idt:
     .short 0x0  # length
-    .int 0x0    # base
+    .int 0x0 - KERNEL_VMA    # base
 ### BEGIN 64-bit GDT ###
 # Descriptor entries
+.align 4
 gdt:
 gdt_null_desc:
     .quad 0x0                       # null descriptor
@@ -71,34 +78,40 @@ gdt_code_desc:
     .quad 0x00209a0000000000        # kernel code descriptor r-x
 gdt_data_desc:
     .quad 0x0000920000000000        # kernel data descriptor rw-
+gdt_end:
 # GDT struct
-p_gdt:
-    .short (p_gdt - gdt - 1)        # limit
-    .quad (gdt)                     # base
+p_gdt32:
+    .short (gdt_end - gdt - 1)      # limit
+    .long gdt - KERNEL_VMA          # base
+p_gdt64:
+    .short (gdt_end - gdt - 1)      # limit
+    .quad gdt                       # base
 # Segment pointers
 .set gdt_code_seg, gdt_code_desc - gdt
 .set gdt_data_seg, gdt_data_desc - gdt
 ### END 64-bit GDT ###
 
 .extern kernel_main
+.extern mb2_info
+.extern mb2_magic
 .section .text
 .code32
 .global _start
 .type _start, @function
 _start:
-    mov $stack_top, %esp
+    mov $(stack_top - KERNEL_VMA), %esp
 
     # Reset EFLAGS
     pushl $0
     popf
 
     # %ebx contains the physical address of MB2 info structure.
-    mov %ebx, (mb2_info)
+    mov %ebx, (mb2_info - KERNEL_VMA)
     # %eax contains MB2 magic number
-    mov %eax, (mb2_magic)
+    mov %eax, (mb2_magic - KERNEL_VMA)
 
     # Now we setup paging.
-    mov $pml4, %edi
+    mov $(pml4 - KERNEL_VMA), %edi
     # 2^14 B needed / 2^4 = 2^10 = 1024 iterations for stosl
     mov $1024, %ecx
     # Initialise page table.
@@ -106,29 +119,24 @@ _start:
     cld
     rep stosl
 
-    # Now we want to point PML4->PDPT->PD
-    # Build PML4 (Page Map Level 4)
-    mov $pdpt, %eax
-    # flags = present | writable
-    or $0x3, %eax
-    mov %eax, (%edi)
-
     # Build PDPT (Page Descriptor Pointer Table)
-    mov $pdpt, %eax
+    mov $(pdpt - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pml4)
+    mov %eax, (pml4 - KERNEL_VMA)
+    mov %eax, (pml4 + (511 * 8) - KERNEL_VMA)   # Mirror at -2G (PML4[511])
 
     ### Build PD0 (0 - 1G) ###
-    mov $pd0, %eax
+    mov $(pd0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt)        # Point PDPT0 entry -> PD0
+    mov %eax, (pdpt - KERNEL_VMA)               # Point PDPT0 entry -> PD0
+    mov %eax, (pdpt + (510 * 8) - KERNEL_VMA)   # First 1G of physical memory maps to PDPT[510]
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
     mov $0x200000, %eax     # Each huge page is 2M
     mul %ecx                # Multiply by counter to calculate page offset
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, pd0(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov %eax, (pd0 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
@@ -140,9 +148,10 @@ _start:
     jne boot_err
 
     ### Build PD1 (1G - 2G) ###
-    mov $pd1, %eax
+    mov $(pd1 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 8)    # Point PDPT1 entry -> PD1 (each PDPTE is 8B)
+    mov %eax, (pdpt + 8 - KERNEL_VMA)           # Point PDPT1 entry -> PD1 (each PDPTE is 8B)
+    mov %eax, (pdpt + (511 * 8) - KERNEL_VMA)   # 1G-2G of physical memory maps to PDPT[511]
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -150,9 +159,9 @@ _start:
     mul %ecx                # Multiply by counter to calculate local page offset
     add $0x40000000, %eax   # This PD starts at 1G
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, pd1(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov %eax, (pd1 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
-    cmp $512, %ecx    # Counter is carried over from last PD
+    cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
     ### PD1 sanity check - total mapped should be 2G ###
     mov $0x200000, %eax
@@ -163,9 +172,9 @@ _start:
     jne boot_err
 
     ### Build PD2 (2G - 3G) ###
-    mov $pd2, %eax
+    mov $(pd2 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 16)    # Point PDPT2 entry -> PD2
+    mov %eax, (pdpt + 16 - KERNEL_VMA)    # Point PDPT2 entry -> PD2
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -173,22 +182,22 @@ _start:
     mul %ecx                # Multiply by counter to calculate page offset
     add $0x80000000, %eax   # This PD starts at 2G
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, pd2(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov %eax, (pd2 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
     ### PD2 sanity check - total mapped should be 3G ###
     mov $0x200000, %eax
     mul %ecx
-    add $0x80000000, %eax   # This PD starts at 1G
+    add $0x80000000, %eax   # This PD starts at 2G
     # assert eax == 0xc0000000 (3G)
     cmp $0xc0000000, %eax
     jne boot_err
 
     ### Build PD3 (3G - 4G) ###
-    mov $pd3, %eax
+    mov $(pd3 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 24)    # Point PDPT3 entry -> PD3
+    mov %eax, (pdpt + 24 - KERNEL_VMA)    # Point PDPT3 entry -> PD3
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -196,7 +205,7 @@ _start:
     mul %ecx                # Multiply by counter to calculate page offset
     add $0xc0000000, %eax   # This PD starts at 3G
     or $0b10000011, %eax    # Set flags PRESENT | WRITABLE
-    mov %eax, pd3(,%ecx,8)  # Load calc'd page offset into nth PD entry
+    mov %eax, (pd3 - KERNEL_VMA)(,%ecx,8)  # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                   # Loop until 512 entries filled for this PD
@@ -205,11 +214,11 @@ _start:
     mul %ecx
     add $0xc0000000, %eax   # This PD starts at 3G
     # assert eax == 0x100000000 (4G)
-    cmp $0x100000000, %eax
+    cmp $0x100000000, %eax  # Yes, this is an overflow.
     jne boot_err
 
     # Load empty IDT
-    lidt (empty_idt)
+    lidt empty_idt - KERNEL_VMA
 
     # Enable PAE and PGE in CR4.
     mov %cr4, %eax
@@ -217,7 +226,7 @@ _start:
     mov %eax, %cr4
 
     # Set CR3 to our PML4 table.
-    mov $pml4, %eax
+    mov $(pml4 - KERNEL_VMA), %eax
     mov %eax, %cr3
 
     # We need to write to the MSR to set the LME (Long Mode Enable) bit.
@@ -235,18 +244,10 @@ _start:
     mov %eax, %cr0
 
     # Load the GDT.
-    lgdt (p_gdt)
-
-    # Set all the segments to the data segment.
-    mov $gdt_data_seg, %ax
-    mov %ax, %fs
-    mov %ax, %gs
-    mov %ax, %ss
-    mov %ax, %ds
-    mov %ax, %es
+    lgdt p_gdt32 - KERNEL_VMA
 
     # Here we go bois.
-    ljmp $gdt_code_seg, $kernel_main
+    ljmp $gdt_code_seg, $(_start64 - KERNEL_VMA)
 
     cli
 1:  hlt
@@ -261,5 +262,37 @@ boot_err:
     mov %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
     inc %ecx
     cmp $(SCREEN_WIDTH * SCREEN_HEIGHT), %ecx
+    jne 1b
+    hlt
+
+.code64
+_start64:
+    movabsq $(_start64_higherhalf - KERNEL_LMA), %rax
+    jmp *%rax
+
+_start64_higherhalf:
+    mov $KERNEL_VMA, %rax
+    add %rax, %rsp              # Adjust stack pointer to higher half
+
+    # Invalidate paging
+    // movq $0, (pml4)
+    // invlpg 0
+
+    call kernel_main
+
+    cli
+1:  hlt
+    jmp 1b
+
+boot64_err:
+    # RSOD
+    mov $0xdeadbeefcafebabe, %rax
+    movl $0, %ecx
+    movl $0x00ff0000, %edx       # ARGB
+1:
+    movl $0xfd000000, %edi       # framebuffer addr
+    movl %edx, (%edi, %ecx, 4)   # draw argb[%edx] to framebuffer[%edi]
+    inc %ecx
+    cmpl $(SCREEN_WIDTH * SCREEN_HEIGHT), %ecx
     jne 1b
     hlt

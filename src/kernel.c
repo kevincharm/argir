@@ -17,6 +17,9 @@ struct pci g_pci;
 uint32_t mb2_magic;
 uint32_t mb2_info;
 
+#define KERNEL_LMA (0x200000)
+#define KERNEL_VMA (0xffffffff80000000 + KERNEL_LMA)
+
 static void init_pci()
 {
     struct pci *pci = &g_pci;
@@ -57,7 +60,7 @@ void kernel_main()
     }
 
     struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
-    uint8_t *fb = ((void *)mb2_tag_fb->framebuffer.addr);
+    uint8_t *fb = ((void *)(mb2_tag_fb->framebuffer.addr));
 
     terminal_init(fb, mb2_tag_fb->framebuffer.width,
                   mb2_tag_fb->framebuffer.height,
@@ -66,6 +69,8 @@ void kernel_main()
 
     gdt_init();
     interrupts_init();
+    __asm__ volatile("mov $0xdeadbeefbeefbeef, %rax\n\t"
+                     "hlt");
     keyboard_init();
     init_pci();
 

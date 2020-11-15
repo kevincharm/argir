@@ -13,7 +13,7 @@ DOCKER_SH=docker run -it --rm \
 AS=x86_64-elf-as
 CC=x86_64-elf-gcc
 LD=x86_64-elf-ld
-CFLAGS=-m64 -std=gnu11 -ffreestanding -fno-stack-protector -O2 -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone \
+CFLAGS=-m64 -std=gnu11 -ffreestanding -fno-stack-protector -O2 -nostdlib -Wall -Wextra -mcmodel=kernel -mno-red-zone \
 	-mgeneral-regs-only -mno-mmx -mno-sse -mno-sse2 -mno-avx
 
 # Build info
@@ -73,7 +73,7 @@ argir.iso: argir.bin
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o argir.iso iso
 
-QEMU=qemu-system-x86_64 -cdrom argir.iso -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d int,cpu_reset -no-reboot
+QEMU=qemu-system-x86_64 -cdrom argir.iso -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d int,cpu_reset -no-reboot -D ./tmp/qemu.log
 
 run: all
 	$(QEMU)
