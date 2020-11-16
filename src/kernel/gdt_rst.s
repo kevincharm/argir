@@ -8,6 +8,10 @@ gdt_rst:
     mov %ax, %fs
     mov %ax, %gs
     mov %ax, %ss
-    jmp code_seg        # Far jump to 0x8 (CS)
+    sub $16, %rsp
+    movq $8, 8(%rsp)
+    movabsq $code_seg, %rax
+    mov %rax, (%rsp)
+    lretq
 code_seg:
     ret

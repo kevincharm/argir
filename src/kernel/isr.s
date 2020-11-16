@@ -42,36 +42,39 @@
 .macro ISR_WRAPPER int_no
     .global isr\int_no
     isr\int_no:
-        push $\int_no      # int_no
-        PUSHA
-        cld
-        call isr_handler
-        POPA
-        add $8, %rsp        # SP+(int_no+err_code)
+        // push $\int_no      # int_no
+        // PUSHA
+        mov $0xfeedface, %rax
+        movq $0x123abc, 0x0
+        hlt
+        // call isr_handler
+        // POPA
+        // add $8, %rsp        # SP+(int_no+err_code)
         iretq
 .endm
 
 .macro ISR_WRAPPER_WITH_ERR int_no
     .global isr\int_no
     isr\int_no\():
-        push $0            # err_code
-        push $\int_no      # int_no
-        PUSHA
-        cld
-        call isr_handler
-        POPA
-        add $16, %rsp        # SP+(int_no+err_code)
+        // push $0            # err_code
+        // push $\int_no      # int_no
+        // PUSHA
+        // cld
+        // call isr_handler
+        // POPA
+        // add $16, %rsp        # SP+(int_no+err_code)
+        hlt
         iretq
 .endm
 
 .global isr_systick
 isr_systick:
-    iret
+    iretq
 
 .global isr_stub
 isr_stub:
     call isr_stub_handler
-    iret
+    iretq
 
 ISR_WRAPPER 0
 ISR_WRAPPER 1

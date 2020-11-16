@@ -28,6 +28,7 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/mb2.o \
 	$(SRC_DIR)/kernel/font_vga.o \
 	$(SRC_DIR)/kernel/gdt.o \
+	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
 	$(SRC_DIR)/kernel/interrupts.o \

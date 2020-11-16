@@ -243,6 +243,13 @@ _start:
 
     # Load the GDT.
     lgdt p_gdt32 - KERNEL_VMA
+    # Reload data segment selectors
+    mov $gdt_data_seg, %ax
+    mov %ax, %ds
+    mov %ax, %es
+    mov %ax, %fs
+    mov %ax, %gs
+    mov %ax, %ss
 
     # Here we go bois.
     ljmp $gdt_code_seg, $(_start64 - KERNEL_VMA)
