@@ -18,17 +18,6 @@ struct pci g_pci;
 uint32_t mb2_magic;
 uint32_t mb2_info;
 
-static void init_pci()
-{
-    struct pci *pci = &g_pci;
-    pci_init(pci);
-    for (int i = 0; i < pci->dev_count; i++) {
-        struct pci_descriptor *p = pci->dev + i;
-        printf("PCI device <vendor: %u, device: %u>\n", p->vendor_id,
-               p->device_id);
-    }
-}
-
 static void print_logo()
 {
     printf(
@@ -70,7 +59,6 @@ void kernel_main()
     gdt_init();
     interrupts_init();
     keyboard_init();
-    init_pci();
 
     interrupts_enable();
 
