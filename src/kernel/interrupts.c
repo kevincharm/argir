@@ -9,6 +9,7 @@
     extern void isr##n(void);                                                  \
     set_interrupt_desc(n, (uint32_t)isr##n);
 
+extern void isr_systick(void);
 extern void isr_stub(void);
 extern void keyboard_irq_handler(void);
 
@@ -40,6 +41,9 @@ void interrupts_init()
     // Initialise the IDT
     for (size_t i = 0; i < IDT_ENTRIES_COUNT; i++)
         memset(&idt[i], 0, sizeof(struct gate_desc));
+
+    // Remap PIC, leaves all IRQs masked.
+    pic_remap();
 
     // Intel-reserved interrupts
     printf("Installing ISRs...\n");
@@ -75,17 +79,15 @@ void interrupts_init()
     IDT_DEFAULT_ISR_HANDLER(29);
     IDT_DEFAULT_ISR_HANDLER(30);
     IDT_DEFAULT_ISR_HANDLER(31);
+    set_interrupt_desc(32, isr_systick); // PIC2[0] => Timer
+    IDT_DEFAULT_ISR_HANDLER(33); // PIC2[1] => PS/2 Keyboard
 
     // Redirect the rest of the IDT entries to the isr stub handler as a sane default
-    for (size_t i = 0; i < 256; i++) {
+    for (size_t i = 34; i < 256; i++) {
         set_interrupt_desc(i, isr_stub);
     }
 
-    // Remap PIC
-    pic_remap();
-
-    // Enable IRQ1 (PS/2)
-    // IDT_DEFAULT_ISR_HANDLER(33);
+    // Unmask the hardware IRQs we want to know about
     pic_enable_all_irqs();
     // pic_enable_only_keyboard();
     // pic_irq_on(1);
