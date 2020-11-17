@@ -14,5 +14,6 @@ void pic_remap();
 void pic_irq_off(unsigned int irq_no);
 void pic_irq_on(unsigned int irq_no);
 void pic_enable_only_keyboard(void);
+void pic_enable_all_irqs(void);
 
 #endif /* __ARGIR__PIC_H */

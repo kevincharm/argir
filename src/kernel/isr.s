@@ -44,8 +44,8 @@
     isr\int_no:
         // push $\int_no      # int_no
         // PUSHA
-        mov $0xfeedface, %rax
-        movq $0x123abc, 0x0
+        mov $0xfeedface, %rbx
+        movq %rbx, 0x0
         hlt
         // call isr_handler
         // POPA
@@ -59,11 +59,13 @@
         // push $0            # err_code
         // push $\int_no      # int_no
         // PUSHA
+        mov $0xdeadbeef, %rbx
+        movq %rbx, 0x0
+        hlt
         // cld
         // call isr_handler
         // POPA
         // add $16, %rsp        # SP+(int_no+err_code)
-        hlt
         iretq
 .endm
 
@@ -73,6 +75,9 @@ isr_systick:
 
 .global isr_stub
 isr_stub:
+    mov $0x1badb007, %rbx
+    movq %rbx, 0x0
+    hlt
     call isr_stub_handler
     iretq
 
