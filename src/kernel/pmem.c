@@ -79,7 +79,7 @@ void pmem_init(struct mb2_info *mb2_info)
         block->base = base;
         block->limit = limit;
         total_bytes_mapped += size;
-        // printf("Available physical @ base: %u, limit: %u, size: %u\n",
+        // printf("Available physical @ base: 0x%x, limit: 0x%x, size: %u\n",
         //        block->base, block->limit, size);
     }
     printf("Total physical memory entries mapped: %u (%u bytes)\n", pmem_count,
