@@ -8,6 +8,7 @@
 #include "kernel/terminal.h"
 #include "kernel/keyboard.h"
 #include "kernel/pci.h"
+#include "kernel/pmem.h"
 
 #ifndef __ARGIR_BUILD_COMMIT__
 #define __ARGIR_BUILD_COMMIT__ "balls"
@@ -63,6 +64,8 @@ void kernel_main()
                   mb2_tag_fb->framebuffer.height,
                   mb2_tag_fb->framebuffer.pitch);
     print_logo();
+
+    pmem_init(mb2_info);
 
     gdt_init();
     interrupts_init();

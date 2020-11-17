@@ -36,6 +36,7 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
 	$(SRC_DIR)/kernel/pci.o \
+	$(SRC_DIR)/kernel/pmem.o \
 	$(SRC_DIR)/kernel.o
 
 KLIB_DIR=$(SRC_DIR)/klib
