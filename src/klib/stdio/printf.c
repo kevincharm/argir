@@ -2,6 +2,48 @@
 #include <stdio.h>
 #include <string.h>
 
+/**
+ * Convert a number to a regular ol' ASCII string.
+ */
+char *ulltoa(unsigned long long num, char *str, int base)
+{
+    char *a = str;
+
+    // Base case
+    if (num == 0) {
+        *a = '0';
+        a += 1;
+        *a = 0;
+        a += 1;
+        return str;
+    }
+
+    // Keep dividing by base to get each digit (backwards, LSB->MSB)
+    for (; num > 0; a += 1, num /= base) {
+        int r = num % base;
+        if (r >= 10) {
+            // Cannot be represented as single char using base 10 numerals
+            *a = 'a' + (r - 10);
+        } else {
+            *a = '0' + r;
+        }
+    }
+
+    // Reverse it
+    char *begin = str;
+    char *end = a - 1;
+    for (; begin < end; begin += 1, end -= 1) {
+        char tmp = *begin;
+        *begin = *end;
+        *end = tmp;
+    }
+
+    // Null terminator.
+    *a = 0;
+
+    return str;
+}
+
 static inline int pow10(unsigned int x)
 {
     unsigned int base = 10;
@@ -80,6 +122,17 @@ int printf(const char *restrict fmt, ...)
                 putchar('0' + n);
                 u -= n * tens;
                 len += 1;
+            }
+            fmt += 1;
+            continue;
+        }
+
+        if (*fmt == 'x') {
+            unsigned long long x = va_arg(ap, unsigned long long);
+            char xbuf[17];
+            char *xbuf_out = ulltoa(x, xbuf, 16);
+            for (; *xbuf_out; xbuf_out += 1, len += 1) {
+                putchar(*xbuf_out);
             }
             fmt += 1;
             continue;
