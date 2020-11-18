@@ -38,28 +38,29 @@ static void print_logo()
 
 void kernel_main()
 {
+    // Sanity check!
     interrupts_disable();
-
     if (mb2_magic != 0x36d76289) {
         /** wat do?! */
         __asm__ volatile("mov $0xdeadbeef, %rax\n\t"
                          "hlt");
     }
 
+    // Graphics
     struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
     uint8_t *fb = ((void *)(mb2_tag_fb->framebuffer.addr));
-
     terminal_init(fb, mb2_tag_fb->framebuffer.width,
                   mb2_tag_fb->framebuffer.height,
                   mb2_tag_fb->framebuffer.pitch);
     print_logo();
 
+    // Early init
     pmem_init(mb2_info);
-
     gdt_init();
     interrupts_init();
     keyboard_init();
 
+    // Ready to go
     interrupts_enable();
 
     for (;;) {
