@@ -7,33 +7,32 @@
 
 #define IDT_DEFAULT_ISR_HANDLER(n)                                             \
     extern void isr##n(void);                                                  \
-    set_interrupt_desc(n, (uint32_t)isr##n);
+    set_interrupt_desc(n, isr##n);
 
 extern void isr_systick(void);
 extern void isr_stub(void);
 extern void keyboard_irq_handler(void);
 
-void isr_handler()
+/**
+ * Generic ISR.
+ */
+void isr_handler(struct interrupt_frame *frame)
 {
-    // __asm__ volatile("mov $0xfeedface, %rax\n\t"
-    //                  "movq $0x123abc, 0x0\n\t");
-    // printf("interrupt received\n");
-    // if (frame.int_no == 33) {
-    //     keyboard_irq_handler();
-    // }
+    printf("int: 0x%x, err: 0x%x\n", frame->int_no, frame->err_code);
+    if (frame->int_no == 33) {
+        keyboard_irq_handler();
+    }
 
-    // pic_eoi(frame.int_no);
+    pic_eoi(frame->int_no);
 }
 
 /**
  * Stub handler.
  */
-void isr_stub_handler()
+void isr_stub_handler(struct interrupt_frame *frame)
 {
-    // __asm__ volatile("mov $0xfeedface, %rax\n\t"
-    //                  "movq $0x123abc, 0x0\n\t");
-    // (void)frame;
-    // printf("IRQ stub handler called!\n");
+    (void)frame;
+    printf("IRQ stub handler called!\n");
 }
 
 void interrupts_init()
