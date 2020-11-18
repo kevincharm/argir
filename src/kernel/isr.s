@@ -88,6 +88,9 @@
 
 .global isr_systick
 isr_systick:
+    # Systick is IRQ0, so send an EOI (¡muy importante!)
+    mov $0x20, %rdi
+    call pic_eoi
     iretq
 
 .global isr_stub

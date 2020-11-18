@@ -15,15 +15,20 @@ extern void keyboard_irq_handler(void);
 
 /**
  * Generic ISR.
+ * TODO: Use separate ISRs instead of single ISR + branching.
  */
 void isr_handler(struct interrupt_frame *frame)
 {
-    printf("int: 0x%x, err: 0x%x\n", frame->int_no, frame->err_code);
-    if (frame->int_no == 33) {
+    if (frame->int_no == 0x21) {
         keyboard_irq_handler();
     }
 
-    pic_eoi(frame->int_no);
+    // Send an EOI iff (!!) this ISR was triggered by an IRQ
+    // IRQ 0-7 from PIC1 = [0x20, 0x28)
+    // IRQ 8-15 from PIC2 = [0x28, 0x30)
+    if (frame->int_no >= 0x20 && frame->int_no < 0x30) {
+        pic_eoi(frame->int_no);
+    }
 }
 
 /**
@@ -31,8 +36,7 @@ void isr_handler(struct interrupt_frame *frame)
  */
 void isr_stub_handler(struct interrupt_frame *frame)
 {
-    (void)frame;
-    printf("IRQ stub handler called!\n");
+    printf("IRQ stub handler called! (int_no: 0x%x)\n", frame->int_no);
 }
 
 void interrupts_init()
@@ -78,8 +82,8 @@ void interrupts_init()
     IDT_DEFAULT_ISR_HANDLER(29);
     IDT_DEFAULT_ISR_HANDLER(30);
     IDT_DEFAULT_ISR_HANDLER(31);
-    set_interrupt_desc(32, isr_systick); // PIC2[0] => Timer
-    IDT_DEFAULT_ISR_HANDLER(33); // PIC2[1] => PS/2 Keyboard
+    set_interrupt_desc(32, isr_systick); // IRQ0: Timer
+    IDT_DEFAULT_ISR_HANDLER(33); // IRQ1: PS/2 Keyboard
 
     // Redirect the rest of the IDT entries to the isr stub handler as a sane default
     for (size_t i = 34; i < 256; i++) {
