@@ -46,12 +46,6 @@
         push $\int_no       # Interrupt number
         PUSHA
 
-        # debugging stuff
-        mov $0xfeedface, %rbx
-        movq %rbx, 0x0
-        mov $\int_no, %rbx
-        movq %rbx, 0x8
-
         # SysV ABI: Clear the string direction flag on interrupt
         cld
 
@@ -70,10 +64,6 @@
         # !!! CPU pushes an error code here !!!
         push $\int_no       # int_no
         PUSHA
-
-        # debugging stuff
-        mov $0xdeadbeef, %rbx
-        movq %rbx, 0x0
 
         # SysV ABI: Clear the string direction flag on interrupt
         cld
