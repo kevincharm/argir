@@ -265,7 +265,11 @@ void keyboard_init()
     ps2_wait_write(PS2_PORT_DATA, 0xff);
     ret = ps2_wait_read(PS2_PORT_DATA);
     if (ret != 0xfa) {
-        printf("PS/2 reset failed!\n");
+        printf("PS/2 reset failed! (0x%x)\n", ret);
+    }
+    ret = ps2_wait_read(PS2_PORT_DATA);
+    if (ret != 0xaa) {
+        printf("PS/2 self-test failed! (0x%x)\n", ret);
     }
 
     ps2_flush_output();

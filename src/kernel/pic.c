@@ -32,8 +32,8 @@ void pic_remap()
     outb(PIC2_PORT_DATA, 0x28); // PIC2 -> 40
 
     // Configure chaining PIC1->PIC2
-    outb(PIC1_PORT_DATA, 0x04);
-    outb(PIC2_PORT_DATA, 0x02);
+    outb(PIC1_PORT_DATA, 0x04); // Slave PIC at IRQ2 (0b100)
+    outb(PIC2_PORT_DATA, 0x02); // Slave PIC identity (0b10)
 
     // 8086 mode.
     outb(PIC1_PORT_DATA, 0x01);
