@@ -78,7 +78,7 @@ argir.iso: argir.bin
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o argir.iso iso
 
-QEMU=qemu-system-x86_64 -cdrom argir.iso -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d int,cpu_reset -no-reboot -D ./tmp/qemu.log
+QEMU=qemu-system-x86_64 -cdrom argir.iso -m 4G -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d int,cpu_reset -no-reboot -D ./tmp/qemu.log
 
 run: all
 	$(QEMU)
