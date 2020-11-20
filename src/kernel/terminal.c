@@ -69,7 +69,9 @@ void terminal_scroll_up(size_t n)
 void terminal_write_char(const char c)
 {
     switch (c) {
-    case 0xd: /* CR */
+    case '\r':
+        term->col = 0;
+        break;
     case '\n':
         term->col = 0;
         term->row += 1;
