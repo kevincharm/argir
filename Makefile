@@ -39,10 +39,13 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/pmem.o \
 	$(SRC_DIR)/kernel.o
 
+
 KLIB_DIR=$(SRC_DIR)/klib
 KLIB_INCLUDE=$(KLIB_DIR)/include
 KLIB_OBJS=\
 	$(KLIB_DIR)/memory/memset.o \
+	$(KLIB_DIR)/memory/memcpy.o \
+	$(KLIB_DIR)/algo/qsort.o \
 	$(KLIB_DIR)/ringbuf/ringbuf.o \
 	$(KLIB_DIR)/stdio/putchar.o \
 	$(KLIB_DIR)/stdio/printf.o \
