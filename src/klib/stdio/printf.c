@@ -86,8 +86,9 @@ int printf(const char *restrict fmt, ...)
             continue;
         }
 
+        // Unsigned (base 10)
         if (*fmt == 'u') {
-            unsigned int u = va_arg(ap, unsigned int);
+            unsigned long long u = va_arg(ap, unsigned long long);
             char ubuf[21];
             char *ubuf_out = ulltoa(u, ubuf, 10);
             for (; *ubuf_out; ubuf_out += 1, len += 1) {
@@ -97,6 +98,7 @@ int printf(const char *restrict fmt, ...)
             continue;
         }
 
+        // Hex
         if (*fmt == 'x') {
             unsigned long long x = va_arg(ap, unsigned long long);
             char xbuf[17];
