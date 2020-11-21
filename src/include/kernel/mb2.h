@@ -31,7 +31,7 @@ struct mb2_tag {
         struct mb2_tag_memory_map {
             uint32_t entry_size;
             uint32_t entry_version;
-            struct mb2_memory_map_entry *entries;
+            struct mb2_memory_map_entry entries[0];
         } __attribute__((packed)) memory_map;
     };
 } __attribute__((packed));

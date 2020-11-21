@@ -117,7 +117,7 @@ void pmem_init(struct mb2_info *mb2_info)
         }
 
         // MB2 Spec Section 3.6.8
-        // type value of 1 indicates available RAM
+        // type 1 indicates available RAM, anything else is reserved or unusable
         if (mm_entry->type != 1) {
             continue;
         }
@@ -130,7 +130,7 @@ void pmem_init(struct mb2_info *mb2_info)
         limit -= (limit % PAGE_SIZE);
         // Total block size, multiple of page size
         uint64_t size = limit - base;
-        if (size == 0) {
+        if (size == 0 || base >= limit) {
             continue;
         }
 
@@ -139,8 +139,6 @@ void pmem_init(struct mb2_info *mb2_info)
         pmem_count += 1;
         block->base = base;
         block->limit = limit;
-        // printf("Available physical @ base: 0x%x, limit: 0x%x, size: %u\n",
-        //        block->base, block->limit, size);
     }
 
     // Sort mapped blocks by base
@@ -158,30 +156,22 @@ void pmem_init(struct mb2_info *mb2_info)
 
                 struct pmem_block *p_i = pmem_map + i;
                 struct pmem_block *p_j = pmem_map + j;
-                // Memory overlap
-                if (p_i->base <= p_j->base && p_i->limit > p_j->base) {
-                    /*
-                     *  xxxx        xx
-                     *    xxxx      xxxx
-                     */
-                    overlap = true;
-                } else if (p_j->base <= p_i->base && p_j->limit > p_i->base) {
-                    /*
-                     *    xxxx      xxxx
-                     *  xxxx        xx
-                     */
+                // Memory overlap: 2 cases
+                if ((p_i->base <= p_j->base && p_i->limit > p_j->base) ||
+                    (p_j->base <= p_i->base && p_j->limit > p_i->base)) {
                     overlap = true;
                 }
                 if (overlap) {
-                    // printf("Overlap regions: [%x, %x] and [%x, %x]\n",
-                    //        p_i->base, p_i->limit, p_j->base, p_j->limit);
+                    // Take min(base_i, base_j) as new base
+                    // Take max(limit_i, limit_j) as new limit
+                    // Assign new base and limit to block i
                     uint64_t merged_base =
                         p_i->base < p_j->base ? p_i->base : p_j->base;
                     uint64_t merged_limit =
                         p_i->limit > p_j->limit ? p_i->limit : p_j->limit;
                     p_i->base = merged_base;
                     p_i->limit = merged_limit;
-                    // p_j is now unused, shift everything left
+                    // block j is now unused, shift everything (to the right of j) left
                     for (size_t k = j; k < pmem_count - 1; k++) {
                         *(pmem_map + k) = *(pmem_map + k + 1);
                     }
@@ -198,9 +188,9 @@ void pmem_init(struct mb2_info *mb2_info)
         struct pmem_block *block = pmem_map + i;
         size_t block_size = block->limit - block->base;
         total_block_size += block_size;
-        printf("Available RAM (%u B) .... %x .... %x\n", block_size,
-               block->base, block->limit);
+        printf("Available RAM %x .. %x (%u MiB)\n", block->base, block->limit,
+               block_size / (1 << 20));
     }
-    printf("Total physical memory entries mapped: %u (%u B)\n\n", pmem_count,
-           total_block_size);
+    printf("Total physical memory entries mapped: %u (%u GiB)\n\n", pmem_count,
+           total_block_size / (1 << 30));
 }
