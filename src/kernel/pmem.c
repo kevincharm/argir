@@ -219,7 +219,6 @@ void paging_init(struct mb2_info *mb2_info)
     printf("Done.\n");
 
     /// Map the available RAM to a linear address space
-    /// TODO: This is SLOW!
     printf("Mapping linear address space...\n");
     for (size_t i = 0; i < pmem_count; i++) {
         struct pmem_block *block = pmem_map + i;

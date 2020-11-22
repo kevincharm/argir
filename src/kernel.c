@@ -48,14 +48,15 @@ void kernel_main()
 
     // Graphics
     struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
-    uint8_t *fb = ((void *)(mb2_tag_fb->framebuffer.addr));
-    terminal_init(fb, mb2_tag_fb->framebuffer.width,
-                  mb2_tag_fb->framebuffer.height,
-                  mb2_tag_fb->framebuffer.pitch);
+    size_t width = mb2_tag_fb->framebuffer.width;
+    size_t height = mb2_tag_fb->framebuffer.height;
+    size_t pitch = mb2_tag_fb->framebuffer.pitch;
+    pmem_init(mb2_info);
+    uint8_t *fb = 0xffffffff40200000;
+    terminal_init(fb, width, height, pitch);
     print_logo();
 
     // Early init
-    pmem_init(mb2_info);
     gdt_init();
     interrupts_init();
     keyboard_init();
