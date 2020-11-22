@@ -9,7 +9,7 @@ KERNEL_VMA = 0xffffffff80000000;
 
 SECTIONS
 {
-    . = KERNEL_VMA + KERNEL_LMA;
+    . = KERNEL_LMA + KERNEL_VMA;
 
     _kernel_start = .;
 

@@ -6,12 +6,14 @@
 #include <algo.h>
 #include <kernel/mb2.h>
 
-// Page table utils
+/// Page table utils
+// Offsets
 #define PAGE_OFFSET_BITS (12)
 #define PTE_BITS (9)
 #define PDE_BITS (9)
 #define PDPTE_BITS (9)
 #define PML4E_BITS (9)
+// Page table index calculators
 #define PML4_INDEX(linear_addr)                                                \
     ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS + PDE_BITS + PDPTE_BITS)) &  \
      0x1ff)
@@ -21,8 +23,15 @@
     ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS)) & 0x1ff)
 #define PT_INDEX(linear_addr) ((linear_addr >> PAGE_OFFSET_BITS) & 0x1ff)
 #define PAGE_OFF(linear_addr) ((linear_addr & 0xfff))
+// Get actual physical address from a PML4/PDPT/PD/PT entry (ignore lower 12-bits)
+#define PML4E_TO_ADDR(addr) (addr & 0xfffffffffffff000)
+// PD or PT entry bits
+#define PDE_HUGE (1 << 7)
+#define PTE_PRESENT (1 << 0)
+#define PTE_READWRITE (1 << 1)
 
 #define PAGE_SIZE (0x1000) /** 4K */
+#define HUGEPAGE_SIZE (0x200000) /** 2M */
 
 struct pmem_block {
     uint64_t base;
@@ -42,68 +51,17 @@ uint8_t pmem_alloc_map[PMEM_MAP_MAX_POOL];
 struct pmem_block pmem_map[MAX_PMEM_ENTRIES];
 size_t pmem_count = 0;
 
-// TODO: Allocate this?
-uint64_t pml4[512];
-
-void paging_init(struct mb2_info *mb2_info)
-{
-    /// Map the linear framebuffer ///
-    struct mb2_tag *tag_fb = mb2_find_tag(mb2_info, MB_TAG_TYPE_FRAMEBUFFER);
-    if (tag_fb == NULL) {
-        // TODO: Panic
-        printf("Failed to find framebuffer tag in boot info.\n");
-        return;
-    }
-
-    // Bytes, pages needed for entire framebuffer
-    const uint64_t fb_page_size = 0x200000; // Use 2M hugepages for LFB
-    size_t fb_size = tag_fb->framebuffer.pitch * tag_fb->framebuffer.height;
-    size_t fb_pages = fb_size / fb_page_size;
-    if (fb_size > 0x40000000) {
-        // We assume that the entire LFB fits inside 1GB
-        // TODO: Panic
-        printf("LFB is larger than 1GiB!\n");
-        return;
-    }
-
-    // TODO: Allocate a PDPT for this PML4 entry
-    uint64_t *pdpt;
-    // TODO: Allocate a PD for this PDPT
-    uint64_t *pd;
-
-    // Convert the LFB identity-mapped linear address to L4 page indices
-    uint64_t physaddr = tag_fb->framebuffer.addr;
-    // We'll map the LFB to -3G in virtual mem (1G below kernel)
-    uint64_t virtaddr = 0xffffffff40200000;
-    // Initial mappings: we know that resolutions upto 4K will fit inside 1 PD with 2M pages
-    pdpt[PDPT_INDEX(virtaddr)] = pd[PD_INDEX(virtaddr)];
-    pml4[PML4_INDEX(virtaddr)] = pdpt[PDPT_INDEX(virtaddr)];
-    for (; physaddr < fb_size;
-         physaddr += fb_page_size, virtaddr += fb_page_size) {
-        // Mark as HUGE | PRESENT | WRITABLE
-        pd[PD_INDEX(virtaddr)] = physaddr | 0b10000011;
-    }
-
-    /// Drop the lower 4G identity mapping ///
-}
-
-int pmem_cmp(const struct pmem_block *a, const struct pmem_block *b)
-{
-    // We're dealing with potentially huge numbers
-    if (a->base > b->base) {
-        return 1;
-    } else if (a->base < b->base) {
-        return -1;
-    } else {
-        return 0;
-    }
-}
+// PML4 is allocated in `paging_init`
+uint64_t pml4[512] __attribute__((aligned(4096)));
+// Limit of the linear address space after `paging_init`
+uint64_t linear_limit = 0;
 
 void *pmem_alloc(size_t bytes)
 {
     if (bytes == 0) {
         // wat
         // TODO: Panic
+        printf("Could not allocate 0 bytes from physical memory!\n");
         return 0xbaadbeef;
     }
 
@@ -132,7 +90,7 @@ void *pmem_alloc(size_t bytes)
         for (byte_off = begin_free + 1; byte_off < PMEM_MAP_MAX_POOL;
              byte_off++) {
             if (pmem_alloc_map[byte_off] & PMEM_ALLOC_MAP_USED) {
-                // Used
+                // Used, start again
                 break;
             }
 
@@ -141,6 +99,7 @@ void *pmem_alloc(size_t bytes)
             if (pages_rem == 0) {
                 // Current block [begin_free, byte_off] is eligible
                 found = true;
+                break;
             }
         }
 
@@ -152,6 +111,12 @@ void *pmem_alloc(size_t bytes)
         // TODO: Panic
         printf("Could not allocate %u bytes from physical memory!\n", bytes);
         return NULL;
+    }
+
+    // Mark slice as allocated
+    for (size_t i = begin_free; i < byte_off; i++) {
+        pmem_alloc_map[i] &= ~PMEM_ALLOC_MAP_UNINITIALISED;
+        pmem_alloc_map[i] |= PMEM_ALLOC_MAP_USED;
     }
 
     return begin_free * PAGE_SIZE;
@@ -174,6 +139,202 @@ void pmem_free(uint64_t base, uint64_t limit)
             return;
         }
         *(pmem_alloc_map + byte_off) = 0;
+    }
+}
+
+void paging_init(struct mb2_info *mb2_info)
+{
+    // Zero-out the PML4
+    for (size_t i = 0; i < 512; i++)
+        pml4[i] = 0;
+
+    /// Temp: Identity map lower 4G
+    printf("Identity mapping lower 4G...\n");
+    for (uint64_t physaddr = 0; physaddr < 0x100000000;
+         physaddr += HUGEPAGE_SIZE) {
+        uint64_t *pdpt;
+        uint64_t *pd;
+        uint64_t *pt;
+        // Ensure PML4 entry has been allocated
+        if (pml4[PML4_INDEX(physaddr)] == 0) {
+            // Allocate and init an empty PDPT for this PML4E
+            pdpt = pmem_alloc(8 * 512);
+            for (size_t e = 0; e < 512; e++)
+                pdpt[e] = 0;
+            // Point this PML4E -> newly alloc'd PDPT
+            pml4[PML4_INDEX(physaddr)] =
+                (uint64_t)pdpt | PTE_PRESENT | PTE_READWRITE;
+        }
+        pdpt = PML4E_TO_ADDR(pml4[PML4_INDEX(physaddr)]);
+        // Ensure PDPT entry has been allocated
+        if (pdpt[PDPT_INDEX(physaddr)] == 0) {
+            // Allocate and init an empty PD for this PDPTE
+            pd = pmem_alloc(8 * 512);
+            for (size_t e = 0; e < 512; e++)
+                pd[e] = 0;
+            // Point this PDPTE -> newly alloc'd PD
+            pdpt[PDPT_INDEX(physaddr)] =
+                (uint64_t)pd | PTE_PRESENT | PTE_READWRITE;
+        }
+        pd = PML4E_TO_ADDR(pdpt[PDPT_INDEX(physaddr)]);
+        pd[PD_INDEX(physaddr)] =
+            physaddr | PDE_HUGE | PTE_PRESENT | PTE_READWRITE;
+    }
+    printf("Done.\n");
+
+    /// Map bottom physical 2G to virtual -2G (lazy af) with 2M hugepages
+    printf("Mapping kernel to upper half...\n");
+    uint64_t upper_half_addr = 0xffffffff80000000;
+    for (uint64_t physaddr = 0; physaddr < 0x100000000;
+         physaddr += HUGEPAGE_SIZE, upper_half_addr += HUGEPAGE_SIZE) {
+        uint64_t *pdpt;
+        uint64_t *pd;
+        uint64_t *pt;
+        // Ensure PML4 entry has been allocated
+        if (pml4[PML4_INDEX(upper_half_addr)] == 0) {
+            // Allocate and init an empty PDPT for this PML4E
+            pdpt = pmem_alloc(8 * 512);
+            for (size_t e = 0; e < 512; e++)
+                pdpt[e] = 0;
+            // Point this PML4E -> newly alloc'd PDPT
+            pml4[PML4_INDEX(upper_half_addr)] =
+                (uint64_t)pdpt | PTE_PRESENT | PTE_READWRITE;
+        }
+        pdpt = PML4E_TO_ADDR(pml4[PML4_INDEX(upper_half_addr)]);
+        // Ensure PDPT entry has been allocated
+        if (pdpt[PDPT_INDEX(upper_half_addr)] == 0) {
+            // Allocate and init an empty PD for this PDPTE
+            pd = pmem_alloc(8 * 512);
+            for (size_t e = 0; e < 512; e++)
+                pd[e] = 0;
+            // Point this PDPTE -> newly alloc'd PD
+            pdpt[PDPT_INDEX(upper_half_addr)] =
+                (uint64_t)pd | PTE_PRESENT | PTE_READWRITE;
+        }
+        pd = PML4E_TO_ADDR(pdpt[PDPT_INDEX(upper_half_addr)]);
+        pd[PD_INDEX(upper_half_addr)] =
+            physaddr | PDE_HUGE | PTE_PRESENT | PTE_READWRITE;
+        // printf("Wrote PDE: 0x%x\n", pd[PD_INDEX(upper_half_addr)]);
+    }
+    printf("Done.\n");
+
+    /// Map the available RAM to a linear address space
+    /// TODO: This is SLOW!
+    printf("Mapping linear address space...\n");
+    for (size_t i = 0; i < pmem_count; i++) {
+        struct pmem_block *block = pmem_map + i;
+        printf("Mapping block starting at 0x%x -> 0x%x...\n", block->base,
+               linear_limit);
+        for (uint64_t physaddr = block->base; physaddr < block->limit;
+
+             physaddr += PAGE_SIZE, linear_limit += PAGE_SIZE) {
+            uint64_t *pdpt;
+            uint64_t *pd;
+            uint64_t *pt;
+            if (pml4[PML4_INDEX(linear_limit)] == 0) {
+                // Allocate and init an empty PDPT for this PML4E
+                pdpt = pmem_alloc(8 * 512);
+                for (size_t e = 0; e < 512; e++)
+                    pdpt[e] = 0;
+                // Point this PML4E -> newly alloc'd PDPT
+                pml4[PML4_INDEX(linear_limit)] =
+                    (uint64_t)pdpt | PTE_PRESENT | PTE_READWRITE;
+            }
+            pdpt = PML4E_TO_ADDR(pml4[PML4_INDEX(linear_limit)]);
+            // Ensure PDPT entry has been allocated
+            if (pdpt[PDPT_INDEX(linear_limit)] == 0) {
+                // Allocate and init an empty PD for this PDPTE
+                pd = pmem_alloc(8 * 512);
+                for (size_t e = 0; e < 512; e++)
+                    pd[e] = 0;
+                // Point this PDPTE -> newly alloc'd PD
+                pdpt[PDPT_INDEX(linear_limit)] =
+                    (uint64_t)pd | PTE_PRESENT | PTE_READWRITE;
+            }
+            pd = PML4E_TO_ADDR(pdpt[PDPT_INDEX(linear_limit)]);
+            // Ensure PD entry has been allocated
+            if (pd[PD_INDEX(linear_limit)] == 0) {
+                // Allocate and init an empty PT for this PDE
+                pt = pmem_alloc(8 * 512);
+                for (size_t e = 0; e < 512; e++)
+                    pt[e] = 0;
+                // Point this PDE -> newly alloc'd PT
+                pd[PD_INDEX(linear_limit)] =
+                    (uint64_t)pt | PTE_PRESENT | PTE_READWRITE;
+            }
+            pt = PML4E_TO_ADDR(pd[PD_INDEX(linear_limit)]);
+            pt[PT_INDEX(linear_limit)] = physaddr | PTE_PRESENT | PTE_READWRITE;
+        }
+    }
+    printf("Done.\n");
+
+    /// Map the linear framebuffer
+    printf("Remapping framebuffer...\n");
+    struct mb2_tag *tag_fb = mb2_find_tag(mb2_info, MB_TAG_TYPE_FRAMEBUFFER);
+    if (tag_fb == NULL) {
+        // TODO: Panic
+        printf("Failed to find framebuffer tag in boot info.\n");
+        return;
+    }
+
+    // Bytes, pages needed for entire framebuffer
+    size_t fb_size = tag_fb->framebuffer.pitch * tag_fb->framebuffer.height;
+    if (fb_size > 0x40000000) {
+        // We assume that the entire LFB fits inside 1GB
+        // TODO: Panic
+        printf("LFB is larger than 1GiB!\n");
+        return;
+    }
+
+    // We'll map the LFB to -3G in virtual mem (1G below kernel)
+    uint64_t virtaddr = 0xffffffff40200000;
+    for (uint64_t physaddr = tag_fb->framebuffer.addr;
+         physaddr < tag_fb->framebuffer.addr + fb_size;
+         physaddr += HUGEPAGE_SIZE, virtaddr += HUGEPAGE_SIZE) {
+        uint64_t *pdpt;
+        uint64_t *pd;
+        uint64_t *pt;
+        // Ensure PML4 entry has been allocated
+        if (pml4[PML4_INDEX(virtaddr)] == 0) {
+            // Allocate and init an empty PDPT for this PML4E
+            pdpt = pmem_alloc(8 * 512);
+            for (size_t e = 0; e < 512; e++)
+                pdpt[e] = 0;
+            // Point this PML4E -> newly alloc'd PDPT
+            pml4[PML4_INDEX(virtaddr)] =
+                (uint64_t)pdpt | PTE_PRESENT | PTE_READWRITE;
+        }
+        pdpt = PML4E_TO_ADDR(pml4[PML4_INDEX(virtaddr)]);
+        // Ensure PDPT entry has been allocated
+        if (pdpt[PDPT_INDEX(virtaddr)] == 0) {
+            // Allocate and init an empty PD for this PDPTE
+            pd = pmem_alloc(8 * 512);
+            for (size_t e = 0; e < 512; e++)
+                pd[e] = 0;
+            // Point this PDPTE -> newly alloc'd PD
+            pdpt[PDPT_INDEX(virtaddr)] =
+                (uint64_t)pd | PTE_PRESENT | PTE_READWRITE;
+        }
+        pd = PML4E_TO_ADDR(pdpt[PDPT_INDEX(virtaddr)]);
+        pd[PD_INDEX(virtaddr)] =
+            physaddr | PDE_HUGE | PTE_PRESENT | PTE_READWRITE;
+    }
+    printf("Done.\n");
+
+    /// Reload CR3 with our new PML4 mapping
+    __asm__ volatile(
+        "movq %0, %%cr3" ::"r"((uint64_t)pml4 - 0xffffffff80000000));
+}
+
+int pmem_cmp(const struct pmem_block *a, const struct pmem_block *b)
+{
+    // We're dealing with potentially huge numbers
+    if (a->base > b->base) {
+        return 1;
+    } else if (a->base < b->base) {
+        return -1;
+    } else {
+        return 0;
     }
 }
 
@@ -211,6 +372,11 @@ void pmem_init(struct mb2_info *mb2_info)
         // Base address, aligned up to nearest page boundary
         uint64_t base = mm_entry->base_addr;
         base += (base % PAGE_SIZE);
+        if (base == 0) {
+            // Don't map the lowest page
+            // So we can use it as a condition for "unmapped"
+            base += PAGE_SIZE;
+        }
         // Limit address, aligned down to nearest page boundary
         uint64_t limit = mm_entry->base_addr + mm_entry->length;
         limit -= (limit % PAGE_SIZE);
@@ -286,4 +452,7 @@ void pmem_init(struct mb2_info *mb2_info)
     }
     printf("Total physical memory entries mapped: %u (%u GiB)\n\n", pmem_count,
            total_block_size / (1 << 30));
+
+    // We now have some memory to allocate for our page tables
+    paging_init(mb2_info);
 }

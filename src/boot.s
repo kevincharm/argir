@@ -44,9 +44,9 @@ mb2_header_end:
 .align 0x1000
 # Identity-mapped paging for first 4G of physical memory.
 # Bottom 2G is also duplicately mapped at -2G (higher-half).
-pml4:
+boot_pml4:
     .skip 0x1000
-pdpt:
+boot_pdpt:
     .skip 0x1000
 # Since we're using hugepages, each PD entry (8B) points to a 2M page.
 # -> Each PD holds 0x1000 / 8 = 512 entries.
@@ -109,7 +109,7 @@ _start:
     mov %eax, (mb2_magic - KERNEL_VMA)
 
     # Now we setup paging.
-    mov $(pml4 - KERNEL_VMA), %edi
+    mov $(boot_pml4 - KERNEL_VMA), %edi
     # 2^14 B needed / 2^4 = 2^10 = 1024 iterations for stosl
     mov $1024, %ecx
     # Initialise page table.
@@ -118,16 +118,16 @@ _start:
     rep stosl
 
     # Build PDPT (Page Descriptor Pointer Table)
-    mov $(pdpt - KERNEL_VMA), %eax
+    mov $(boot_pdpt - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pml4 - KERNEL_VMA)
-    mov %eax, (pml4 + (511 * 8) - KERNEL_VMA)   # Mirror at -2G (PML4[511])
+    mov %eax, (boot_pml4 - KERNEL_VMA)
+    mov %eax, (boot_pml4 + (511 * 8) - KERNEL_VMA)   # Mirror at -2G (PML4[511])
 
     ### Build PD0 (0 - 1G) ###
     mov $(pd0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt - KERNEL_VMA)               # Point PDPT0 entry -> PD0
-    mov %eax, (pdpt + (510 * 8) - KERNEL_VMA)   # First 1G of physical memory maps to PDPT[510]
+    mov %eax, (boot_pdpt - KERNEL_VMA)               # Point PDPT0 entry -> PD0
+    mov %eax, (boot_pdpt + (510 * 8) - KERNEL_VMA)   # First 1G of physical memory maps to PDPT[510]
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -148,8 +148,8 @@ _start:
     ### Build PD1 (1G - 2G) ###
     mov $(pd1 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 8 - KERNEL_VMA)           # Point PDPT1 entry -> PD1 (each PDPTE is 8B)
-    mov %eax, (pdpt + (511 * 8) - KERNEL_VMA)   # 1G-2G of physical memory maps to PDPT[511]
+    mov %eax, (boot_pdpt + 8 - KERNEL_VMA)           # Point PDPT1 entry -> PD1 (each PDPTE is 8B)
+    mov %eax, (boot_pdpt + (511 * 8) - KERNEL_VMA)   # 1G-2G of physical memory maps to PDPT[511]
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -172,7 +172,7 @@ _start:
     ### Build PD2 (2G - 3G) ###
     mov $(pd2 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 16 - KERNEL_VMA)          # Point PDPT2 entry -> PD2
+    mov %eax, (boot_pdpt + 16 - KERNEL_VMA)          # Point PDPT2 entry -> PD2
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -195,7 +195,7 @@ _start:
     ### Build PD3 (3G - 4G) ###
     mov $(pd3 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt + 24 - KERNEL_VMA)          # Point PDPT3 entry -> PD3
+    mov %eax, (boot_pdpt + 24 - KERNEL_VMA)          # Point PDPT3 entry -> PD3
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -224,7 +224,7 @@ _start:
     mov %eax, %cr4
 
     # Set CR3 to our PML4 table.
-    mov $(pml4 - KERNEL_VMA), %eax
+    mov $(boot_pml4 - KERNEL_VMA), %eax
     mov %eax, %cr3
 
     # We need to write to the MSR to set the LME (Long Mode Enable) bit.
@@ -281,7 +281,7 @@ _start64_higherhalf:
     mov $stack_bottom, %rbp
 
     # Invalidate paging
-    // movq $0, (pml4)
+    // movq $0, (boot_pml4)
     // invlpg 0
 
     call kernel_main
