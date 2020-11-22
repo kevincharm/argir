@@ -30,12 +30,12 @@ struct pmem_block {
 };
 
 // 1GiB / 4K = 262,144 pages
-// 262,144 pages / 8 bits = 32K bitmap space per GiB
-#define PMEM_BITMAP_MAX_POOL (16 * 32768) /** 512K pool -> 16G addressable */
-/// Early static physical memory bitmap
-// Set bit -> allocated
-// Clear bit -> free
-uint8_t pmem_alloc_bitmap[PMEM_BITMAP_MAX_POOL];
+// 262,144 pages = 256K bitmap space per GiB
+#define PMEM_MAP_MAX_POOL (16 * 262144) /** 4M pool -> 16G addressable */
+/// Early static physical alloc map
+uint8_t pmem_alloc_map[PMEM_MAP_MAX_POOL];
+#define PMEM_ALLOC_MAP_USED (1 << 0)
+#define PMEM_ALLOC_MAP_UNINITIALISED (1 << 7)
 
 #define MAX_PMEM_ENTRIES (128) /** 128 * 16B = 2K, enough for now? */
 /// Memory map from MB2 boot info, sorted and merged
@@ -114,6 +114,47 @@ void *pmem_alloc(size_t bytes)
     }
 
     // Find a free slice, mark it as allocated
+    bool found = false;
+    size_t byte_off = 0;
+    size_t begin_free = 0;
+    do {
+        size_t pages_rem = pages;
+        // Search for an unallocated page
+        for (; byte_off < PMEM_MAP_MAX_POOL; byte_off++) {
+            if (!(pmem_alloc_map[byte_off] & PMEM_ALLOC_MAP_USED)) {
+                // Available
+                begin_free = byte_off;
+                break;
+            }
+        }
+
+        // Check for a large-enough contiguous block
+        for (byte_off = begin_free + 1; byte_off < PMEM_MAP_MAX_POOL;
+             byte_off++) {
+            if (pmem_alloc_map[byte_off] & PMEM_ALLOC_MAP_USED) {
+                // Used
+                break;
+            }
+
+            pages_rem -= 1;
+
+            if (pages_rem == 0) {
+                // Current block [begin_free, byte_off] is eligible
+                found = true;
+            }
+        }
+
+        if (byte_off >= PMEM_MAP_MAX_POOL)
+            break;
+    } while (!found);
+
+    if (!found) {
+        // TODO: Panic
+        printf("Could not allocate %u bytes from physical memory!\n", bytes);
+        return NULL;
+    }
+
+    return begin_free * PAGE_SIZE;
 }
 
 /**
@@ -125,30 +166,15 @@ void pmem_free(uint64_t base, uint64_t limit)
     uint64_t page_off;
     size_t byte_off;
     for (page_off = base; page_off < limit; page_off += PAGE_SIZE) {
-        // Each bitmap (=8b) holds 8 pages
-        byte_off = page_off / (PAGE_SIZE << 3);
-        if (byte_off >= PMEM_BITMAP_MAX_POOL) {
+        byte_off = page_off / PAGE_SIZE;
+        if (byte_off >= PMEM_MAP_MAX_POOL) {
+            // TODO: Panic
             printf("Ran out of bitmap memory pool! (byte_off = %u)\n",
                    byte_off);
             return;
         }
-        *(pmem_alloc_bitmap + byte_off) = 0;
+        *(pmem_alloc_map + byte_off) = 0;
     }
-    // Leftover bits
-    byte_off = page_off / (PAGE_SIZE << 3);
-    if (byte_off >= PMEM_BITMAP_MAX_POOL) {
-        return;
-    }
-    uint8_t *bitmap = pmem_alloc_bitmap + byte_off;
-    *bitmap = 0;
-    size_t bit_off = page_off % (PAGE_SIZE << 3);
-    while (bit_off--)
-        *bitmap &= ~(1 << bit_off);
-    goto done;
-
-oom:
-    printf("Ran out of bitmap memory pool! (byte_off = %u)\n", byte_off);
-done:
 }
 
 /**
@@ -243,9 +269,10 @@ void pmem_init(struct mb2_info *mb2_info)
     break_overlap_loop:;
     } while (overlap);
 
-    // Mark bitmap as not free ("allocated") by default
-    for (size_t i = 0; i < PMEM_BITMAP_MAX_POOL; i++)
-        *(pmem_alloc_bitmap + i) = 0xff;
+    // Mark physical alloc map as not free ("allocated") by default
+    for (size_t i = 0; i < PMEM_MAP_MAX_POOL; i++)
+        *(pmem_alloc_map + i) =
+            PMEM_ALLOC_MAP_UNINITIALISED | PMEM_ALLOC_MAP_USED;
 
     // Summary & mark free pages
     size_t total_block_size = 0;
