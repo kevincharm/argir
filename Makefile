@@ -37,6 +37,7 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/terminal.o \
 	$(SRC_DIR)/kernel/pci.o \
 	$(SRC_DIR)/kernel/pmem.o \
+	$(SRC_DIR)/kernel/paging.o \
 	$(SRC_DIR)/kernel.o
 
 
@@ -66,9 +67,11 @@ argir.bin: $(KERNEL_OBJS) $(KLIB_OBJS)
 %.o: %.s
 	$(AS) $< -o $@
 
+%.o: %.S
+	$(CC) -c $< -o $@ -I$(KERNEL_INCLUDE)
+
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@ \
-	-I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) -D$(KERNEL_DEFINES)
+	$(CC) $(CFLAGS) -c $< -o $@ -I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) -D$(KERNEL_DEFINES)
 
 # Disk image & Qemu
 argir.iso: argir.bin

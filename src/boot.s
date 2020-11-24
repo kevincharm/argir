@@ -1,5 +1,4 @@
-.set KERNEL_LMA, (0x200000)
-.set KERNEL_VMA, (0xffffffff80000000)
+#include "kernel/addr.h"
 
 ###############################################################################
 #   Multiboot2 Header                                                         #
