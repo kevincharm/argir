@@ -177,11 +177,7 @@ void pmem_init(struct mb2_info *mb2_info)
     do {
         overlap = false;
         for (size_t i = 0; i < pmem_count; i++) {
-            for (size_t j = i; j < pmem_count; j++) {
-                if (i == j) {
-                    continue;
-                }
-
+            for (size_t j = i + 1; j < pmem_count; j++) {
                 struct pmem_block *p_i = pmem_map + i;
                 struct pmem_block *p_j = pmem_map + j;
                 // Memory overlap: 2 cases
