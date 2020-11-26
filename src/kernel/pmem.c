@@ -147,7 +147,9 @@ void pmem_init(struct mb2_info *mb2_info)
 
         // Base address, aligned up to nearest page boundary
         uint64_t base = mm_entry->base_addr;
-        base += (base % PAGE_SIZE);
+        if (base % PAGE_SIZE != 0) {
+            base += PAGE_SIZE - (base % PAGE_SIZE);
+        }
         if (base == 0) {
             // Don't map the lowest page
             // So we can use it as a condition for "unmapped"
