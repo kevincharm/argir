@@ -10,6 +10,7 @@
 #include "kernel/keyboard.h"
 #include "kernel/pci.h"
 #include "kernel/pmem.h"
+#include "kernel/paging.h"
 
 #ifndef __ARGIR_BUILD_COMMIT__
 #define __ARGIR_BUILD_COMMIT__ "balls"
@@ -30,12 +31,14 @@ void kernel_main(void)
 
     // Extract required info from MB2 bootinfo before it disappears
     struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
+    uint64_t ident_lfb_addr = mb2_tag_fb->framebuffer.addr;
     size_t width = mb2_tag_fb->framebuffer.width;
     size_t height = mb2_tag_fb->framebuffer.height;
     size_t pitch = mb2_tag_fb->framebuffer.pitch;
 
+    terminal_init(ident_lfb_addr, width, height, pitch);
     pmem_init(mb2_info);
-    terminal_init(LFB_VMA, width, height, pitch);
+    terminal_init(LFB_VMA, width, height, pitch); // with higher-half LFB
     print_build_info();
 
     gdt_init();

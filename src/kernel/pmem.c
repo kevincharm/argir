@@ -22,6 +22,7 @@ void *pmem_alloc(size_t bytes)
         // wat
         // TODO: Panic
         printf("Could not allocate 0 bytes from physical memory!\n");
+        goto panic;
         return 0xbaadbeef;
     }
 
@@ -70,8 +71,12 @@ void *pmem_alloc(size_t bytes)
     if (!found) {
         // TODO: Panic
         printf("Could not allocate %u bytes from physical memory!\n", bytes);
+        goto panic;
         return NULL;
     }
+
+    // printf("Allocated: %x .. %x\n", begin_free * PAGE_SIZE,
+    //        byte_off * PAGE_SIZE);
 
     // Mark slice as allocated
     for (size_t i = begin_free; i < byte_off; i++) {
@@ -80,6 +85,10 @@ void *pmem_alloc(size_t bytes)
     }
 
     return begin_free * PAGE_SIZE;
+
+panic:
+    __asm__ volatile("mov $0xbaaaaaadbeeeeeef, %rax\n\t"
+                     "hlt");
 }
 
 /**
@@ -117,7 +126,6 @@ static int pmem_cmp(const struct pmem_block *a, const struct pmem_block *b)
 /**
  * Determine what physical memory is available given the memory map from the bootloader,
  * then setup our physical memory manager so we can start allocating.
- * mb2_info will NOT be available after this subroutine returns.
  */
 void pmem_init(struct mb2_info *mb2_info)
 {
