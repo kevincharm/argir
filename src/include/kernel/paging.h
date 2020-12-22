@@ -8,11 +8,11 @@
 #define PAGE_SIZE (0x1000) /** 4K */
 #define HUGEPAGE_SIZE (0x200000) /** 2M */
 
-// PML4 is allocated in `paging_init`
-uint64_t pml4[512] __attribute__((aligned(4096)));
 // Limit of the linear address space after `paging_init`
 uint64_t linear_limit;
 
+void *map_temp_page(uint64_t physaddr);
+void unmap_temp_page(void);
 void paging_init(struct mb2_info *mb2_info);
 
 #endif /* __ARGIR__PAGING_H */

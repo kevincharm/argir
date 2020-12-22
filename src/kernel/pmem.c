@@ -5,90 +5,30 @@
 #include <memory.h>
 #include <algo.h>
 #include "kernel/pmem.h"
+#include "kernel/paging.h"
 
-// 1GiB / 4K = 262,144 pages
-// 262,144 pages = 256K bitmap space per GiB
-#define PMEM_MAP_MAX_POOL (16 * 262144) /** 4M pool -> 16G addressable */
-/// Early static physical alloc map
-uint8_t pmem_alloc_map[PMEM_MAP_MAX_POOL];
-#define PMEM_ALLOC_MAP_USED (1 << 0)
-#define PMEM_ALLOC_MAP_UNINITIALISED (1 << 7)
+// Number of contiguous blocks of RAM
+size_t pmem_blocks_count = 0;
+// Number of free 4K pages
+size_t usable_pages = 0;
+// Phys address of next available page
+uint64_t next_free_page_off = 0;
 
-size_t pmem_count = 0;
-
-void *pmem_alloc(size_t bytes)
+/**
+ * Return an available physical page (initialised with zeros).
+ */
+void *pmem_alloc_page()
 {
-    if (bytes == 0) {
-        // wat
-        // TODO: Panic
-        printf("Could not allocate 0 bytes from physical memory!\n");
-        goto panic;
-        return 0xbaadbeef;
-    }
+    uint64_t allocated = next_free_page_off;
+    // Temporarily map the next available page offset so we can access it
+    uint64_t *temp_page = map_temp_page(allocated);
+    // Ensure memory content is empty
+    memset(temp_page, 0, PAGE_SIZE);
+    // Dark magicks: the next available page offset is stored at this physical address
+    next_free_page_off = *temp_page;
+    unmap_temp_page();
 
-    // Pages needed == clear bits needed
-    size_t pages = bytes / PAGE_SIZE;
-    if (bytes % PAGE_SIZE != 0) {
-        pages += 1;
-    }
-
-    // Find a free slice, mark it as allocated
-    bool found = false;
-    size_t byte_off = 0;
-    size_t begin_free = 0;
-    do {
-        size_t pages_rem = pages;
-        // Search for an unallocated page
-        for (; byte_off < PMEM_MAP_MAX_POOL; byte_off++) {
-            if (!(pmem_alloc_map[byte_off] & PMEM_ALLOC_MAP_USED)) {
-                // Available
-                begin_free = byte_off;
-                break;
-            }
-        }
-
-        // Check for a large-enough contiguous block
-        for (byte_off = begin_free + 1; byte_off < PMEM_MAP_MAX_POOL;
-             byte_off++) {
-            if (pmem_alloc_map[byte_off] & PMEM_ALLOC_MAP_USED) {
-                // Used, start again
-                break;
-            }
-
-            pages_rem -= 1;
-
-            if (pages_rem == 0) {
-                // Current block [begin_free, byte_off] is eligible
-                found = true;
-                break;
-            }
-        }
-
-        if (byte_off >= PMEM_MAP_MAX_POOL)
-            break;
-    } while (!found);
-
-    if (!found) {
-        // TODO: Panic
-        printf("Could not allocate %u bytes from physical memory!\n", bytes);
-        goto panic;
-        return NULL;
-    }
-
-    // printf("Allocated: %x .. %x\n", begin_free * PAGE_SIZE,
-    //        byte_off * PAGE_SIZE);
-
-    // Mark slice as allocated
-    for (size_t i = begin_free; i < byte_off; i++) {
-        pmem_alloc_map[i] &= ~PMEM_ALLOC_MAP_UNINITIALISED;
-        pmem_alloc_map[i] |= PMEM_ALLOC_MAP_USED;
-    }
-
-    return begin_free * PAGE_SIZE;
-
-panic:
-    __asm__ volatile("mov $0xbaaaaaadbeeeeeef, %rax\n\t"
-                     "hlt");
+    return allocated;
 }
 
 /**
@@ -97,17 +37,16 @@ panic:
 void pmem_free_range /** chicken */ (uint64_t base, uint64_t limit)
 {
     // Mark free pages contained in this contiguous block of RAM
-    uint64_t page_off;
-    size_t byte_off;
-    for (page_off = base; page_off < limit; page_off += PAGE_SIZE) {
-        byte_off = page_off / PAGE_SIZE;
-        if (byte_off >= PMEM_MAP_MAX_POOL) {
-            // TODO: Panic
-            printf("Ran out of bitmap memory pool! (byte_off = %u)\n",
-                   byte_off);
-            return;
-        }
-        *(pmem_alloc_map + byte_off) = 0;
+    for (uint64_t page_off = base; page_off < limit; page_off += PAGE_SIZE) {
+        // Temporarily map this physical address so we can access it
+        uint64_t *temp_page = map_temp_page(page_off);
+        // Dark magicks: store the next available physical page offset at `page_off`
+        *temp_page = next_free_page_off;
+        // The next available physical page offset is now `page_off`
+        next_free_page_off = page_off;
+        unmap_temp_page();
+
+        usable_pages += 1;
     }
 }
 
@@ -142,7 +81,7 @@ void pmem_init(struct mb2_info *mb2_info)
          mm_entry =
              (struct mb2_memory_map_entry *)((unsigned long)mm_entry +
                                              tag->memory_map.entry_size)) {
-        if (pmem_count >= MAX_PMEM_ENTRIES) {
+        if (pmem_blocks_count >= MAX_PMEM_ENTRIES) {
             // We're out of early-allocated space!
             break;
         }
@@ -173,23 +112,23 @@ void pmem_init(struct mb2_info *mb2_info)
         }
 
         // Record available block of RAM
-        struct pmem_block *block = pmem_map + pmem_count;
-        pmem_count += 1;
+        struct pmem_block *block = pmem_block_map + pmem_blocks_count;
+        pmem_blocks_count += 1;
         block->base = base;
         block->limit = limit;
     }
 
     // Sort mapped blocks by base
-    qsort(pmem_map, pmem_count, sizeof(*pmem_map), pmem_cmp);
+    qsort(pmem_block_map, pmem_blocks_count, sizeof(*pmem_block_map), pmem_cmp);
 
     // Merge overlapping blocks
     bool overlap;
     do {
         overlap = false;
-        for (size_t i = 0; i < pmem_count; i++) {
-            for (size_t j = i + 1; j < pmem_count; j++) {
-                struct pmem_block *p_i = pmem_map + i;
-                struct pmem_block *p_j = pmem_map + j;
+        for (size_t i = 0; i < pmem_blocks_count; i++) {
+            for (size_t j = i + 1; j < pmem_blocks_count; j++) {
+                struct pmem_block *p_i = pmem_block_map + i;
+                struct pmem_block *p_j = pmem_block_map + j;
                 // Memory overlap: 2 cases
                 if ((p_i->base <= p_j->base && p_i->limit > p_j->base) ||
                     (p_j->base <= p_i->base && p_j->limit > p_i->base)) {
@@ -206,10 +145,10 @@ void pmem_init(struct mb2_info *mb2_info)
                     p_i->base = merged_base;
                     p_i->limit = merged_limit;
                     // block j is now unused, shift everything (to the right of j) left
-                    for (size_t k = j; k < pmem_count - 1; k++) {
-                        *(pmem_map + k) = *(pmem_map + k + 1);
+                    for (size_t k = j; k < pmem_blocks_count - 1; k++) {
+                        *(pmem_block_map + k) = *(pmem_block_map + k + 1);
                     }
-                    pmem_count -= 1;
+                    pmem_blocks_count -= 1;
                     goto break_overlap_loop; // break nested loop
                 }
             }
@@ -217,23 +156,18 @@ void pmem_init(struct mb2_info *mb2_info)
     break_overlap_loop:;
     } while (overlap);
 
-    // Mark physical alloc map as not free ("allocated") by default
-    for (size_t i = 0; i < PMEM_MAP_MAX_POOL; i++)
-        *(pmem_alloc_map + i) =
-            PMEM_ALLOC_MAP_UNINITIALISED | PMEM_ALLOC_MAP_USED;
-
     // Summary & mark free pages
     size_t total_block_size = 0;
-    for (size_t i = 0; i < pmem_count; i++) {
-        struct pmem_block *block = pmem_map + i;
+    for (size_t i = 0; i < pmem_blocks_count; i++) {
+        struct pmem_block *block = pmem_block_map + i;
         size_t block_size = block->limit - block->base;
         total_block_size += block_size;
         printf("Available RAM %x .. %x (%u MiB)\n", block->base, block->limit,
                block_size / (1 << 20));
         pmem_free_range(block->base, block->limit);
     }
-    printf("Total physical memory entries mapped: %u (%u GiB)\n\n", pmem_count,
-           total_block_size / (1 << 30));
+    printf("Total physical memory entries mapped: %u (%u GiB)\n\n",
+           pmem_blocks_count, total_block_size / (1 << 30));
 
     // We now have some memory to allocate for our page tables
     paging_init(mb2_info);

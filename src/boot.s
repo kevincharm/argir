@@ -117,8 +117,13 @@ _start:
     # Build PML4[0]->PDPT (Page Descriptor Pointer Table)
     mov $(pdpt0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (boot_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0
-    mov %eax, (boot_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->PDPT0 (Duplicate mapping at -2G)
+    mov %eax, (boot_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0 (Identity map)
+    mov %eax, (boot_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->PDPT0 (Higher-half map at -2G)
+
+    # Recursive map @PML4[510] -> [0xffffff0000000000, 0xffffff8000000000)
+    mov (boot_pml4 - KERNEL_VMA), %eax
+    or $0x3, %eax
+    mov %eax, (boot_pml4 + (510 * 8) - KERNEL_VMA)
 
     ### Build PD0 (0 - 1G) ###
     mov $(pd0 - KERNEL_VMA), %eax
