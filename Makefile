@@ -104,4 +104,4 @@ sections:
 	greadelf -S $(ISO_DIR)/boot/argir.bin
 
 objdump:
-	objdump -x $(ISO_DIR)/boot/argir.bin
+	objdump -dx $(ISO_DIR)/boot/argir.bin
