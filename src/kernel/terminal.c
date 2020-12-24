@@ -35,6 +35,10 @@ static inline void terminal_vga_colour_set(uint8_t fg, uint8_t bg)
 
 static inline void vga_text_set(size_t x, size_t y, unsigned char c)
 {
+    if (term->fb == NULL) {
+        return;
+    }
+
     // term->buffer[i] = ((uint16_t)(term->colour) << 8u) | c;
     // Find the glyph offset in the font bitmap
     size_t glyph_x_off = (c - 0x20) * GLYPH_WIDTH;
@@ -56,6 +60,10 @@ static inline void vga_text_set(size_t x, size_t y, unsigned char c)
 
 void terminal_scroll_up(size_t n)
 {
+    if (term->fb == NULL) {
+        return;
+    }
+
     size_t total = term->fb_pitch * term->fb_height;
     size_t sub = KFONT_VGA_HEIGHT * n * term->fb_pitch;
     for (size_t i = sub; i < total; i++) {
@@ -101,8 +109,8 @@ void terminal_write_char(const char c)
 
 void terminal_clear()
 {
-    for (size_t y = 0; y < (term->height); y++) {
-        for (size_t x = 0; x < (term->width); x++) {
+    for (size_t y = 0; y < term->height; y++) {
+        for (size_t x = 0; x < term->width; x++) {
             vga_text_set(x, y, ' ');
         }
     }

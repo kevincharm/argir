@@ -11,43 +11,33 @@
 size_t pmem_blocks_count = 0;
 // Number of free 4K pages
 size_t usable_pages = 0;
-// Phys address of next available page
-uint64_t next_free_page_off = 0;
+// Index of the free block currently giving allocations
+size_t pmem_current_block = 0;
 
 /**
  * Return an available physical page (initialised with zeros).
  */
 void *pmem_alloc_page()
 {
-    uint64_t allocated = next_free_page_off;
-    // Temporarily map the next available page offset so we can access it
-    uint64_t *temp_page = map_temp_page(allocated);
-    // Ensure memory content is empty
-    memset(temp_page, 0, PAGE_SIZE);
-    // Dark magicks: the next available page offset is stored at this physical address
-    next_free_page_off = *temp_page;
-    unmap_temp_page();
+    struct pmem_block *block = pmem_block_map + pmem_current_block;
 
-    return allocated;
-}
+    // First check if we have enough space to allocate from this block
+    if (block->limit - block->base < PAGE_SIZE) {
+        // Not enough space left in this block, move on to the previous
+        pmem_current_block -= 1;
+        if (pmem_current_block < 0) {
+            /// TODO: PANIC
+            printf("Out of physical memory!\n");
+            __asm__ volatile("hlt");
+            return;
+        }
 
-/**
- * Mark all pages in a block of contiguous physical memory as free.
- */
-void pmem_free_range /** chicken */ (uint64_t base, uint64_t limit)
-{
-    // Mark free pages contained in this contiguous block of RAM
-    for (uint64_t page_off = base; page_off < limit; page_off += PAGE_SIZE) {
-        // Temporarily map this physical address so we can access it
-        uint64_t *temp_page = map_temp_page(page_off);
-        // Dark magicks: store the next available physical page offset at `page_off`
-        *temp_page = next_free_page_off;
-        // The next available physical page offset is now `page_off`
-        next_free_page_off = page_off;
-        unmap_temp_page();
-
-        usable_pages += 1;
+        // Try again with new block index
+        return pmem_alloc_page();
     }
+
+    block->limit -= PAGE_SIZE;
+    return block->limit;
 }
 
 static int pmem_cmp(const struct pmem_block *a, const struct pmem_block *b)
@@ -164,7 +154,8 @@ void pmem_init(struct mb2_info *mb2_info)
         total_block_size += block_size;
         printf("Available RAM %x .. %x (%u MiB)\n", block->base, block->limit,
                block_size / (1 << 20));
-        pmem_free_range(block->base, block->limit);
+        // We will allocate physical pages backwards starting from the last block
+        pmem_current_block = i;
     }
     printf("Total physical memory entries mapped: %u (%u GiB)\n\n",
            pmem_blocks_count, total_block_size / (1 << 30));

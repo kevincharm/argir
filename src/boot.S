@@ -42,8 +42,9 @@ mb2_header_end:
 .align 0x1000
 # Identity-mapped paging for first 4G of physical memory.
 # Bottom 2G is also duplicately mapped at -2G (higher-half).
-boot_pml4:
-    .skip 0x1000
+.extern kernel_pml4
+// kernel_pml4:
+//     .skip 0x1000
 pdpt0:
     .skip 0x1000
 # Since we're using hugepages, each PD entry (8B) points to a 2M page.
@@ -107,7 +108,7 @@ _start:
     mov %eax, (mb2_magic - KERNEL_VMA)
 
     # Now we setup paging.
-    mov $(boot_pml4 - KERNEL_VMA), %edi
+    mov $(kernel_pml4 - KERNEL_VMA), %edi
     # Zero-out PML4 (1024 * 4B = 4096B)
     mov $1024, %ecx
     xor %eax, %eax
@@ -117,13 +118,13 @@ _start:
     # Build PML4[0]->PDPT (Page Descriptor Pointer Table)
     mov $(pdpt0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (boot_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0 (Identity map)
-    mov %eax, (boot_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->PDPT0 (Higher-half map at -2G)
+    mov %eax, (kernel_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0 (Identity map)
+    mov %eax, (kernel_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->PDPT0 (Higher-half map at -2G)
 
     # Recursive map @PML4[510] -> [0xffffff0000000000, 0xffffff8000000000)
-    mov (boot_pml4 - KERNEL_VMA), %eax
+    mov (kernel_pml4 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (boot_pml4 + (510 * 8) - KERNEL_VMA)
+    mov %eax, (kernel_pml4 + (510 * 8) - KERNEL_VMA)
 
     ### Build PD0 (0 - 1G) ###
     mov $(pd0 - KERNEL_VMA), %eax
@@ -226,7 +227,7 @@ _start:
     mov %eax, %cr4
 
     # Load our PML4 (flushes TLB)
-    mov $(boot_pml4 - KERNEL_VMA), %eax
+    mov $(kernel_pml4 - KERNEL_VMA), %eax
     mov %eax, %cr3
 
     # We need to write to the MSR to set the LME (Long Mode Enable) bit.
@@ -281,6 +282,13 @@ _start64_higherhalf:
     mov $KERNEL_VMA, %rax
     add %rax, %rsp                                  # Adjust stack pointer to higher half
     mov $stack_bottom, %rbp
+
+    # Drop identity map
+    mov $0, %eax
+    mov %eax, (kernel_pml4)              # PML4[0]->PDPT0 (Identity map)
+    # Reload PML4, flush TLB
+    mov $(kernel_pml4 - KERNEL_VMA), %rax
+    mov %rax, %cr3
 
     call kernel_main
 

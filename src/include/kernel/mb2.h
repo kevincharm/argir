@@ -41,6 +41,6 @@ struct mb2_info {
     uint32_t reserved;
 } __attribute__((packed));
 
-struct mb2_tag *mb2_find_tag(uint32_t mb2_info, uint32_t type);
+struct mb2_tag *mb2_find_tag(uint64_t mb2_info, uint32_t type);
 
 #endif /* __ARGIR__MB2_H */

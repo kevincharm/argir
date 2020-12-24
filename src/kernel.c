@@ -28,17 +28,17 @@ void kernel_main(void)
         __asm__ volatile("mov $0xbaaaaaadb0000007, %rax\n\t"
                          "hlt"); // MB2 did not drop us here!
     }
-
+    uint64_t mb2_info_vma = (uint64_t)mb2_info + KERNEL_VMA;
     // Extract required info from MB2 bootinfo before it disappears
-    struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info, 8);
-    uint64_t ident_lfb_addr = mb2_tag_fb->framebuffer.addr;
+    struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info_vma, 8);
     size_t width = mb2_tag_fb->framebuffer.width;
     size_t height = mb2_tag_fb->framebuffer.height;
     size_t pitch = mb2_tag_fb->framebuffer.pitch;
+    /// This works properly! We are using the higher-half mb2_info addr.
+    /// We still need to remap LFB to -3G.
 
-    terminal_init(ident_lfb_addr, width, height, pitch);
-    pmem_init(mb2_info);
-    terminal_init(LFB_VMA, width, height, pitch); // with higher-half LFB
+    terminal_init(NULL, width, height, pitch);
+    pmem_init(mb2_info_vma);
     print_build_info();
 
     gdt_init();
