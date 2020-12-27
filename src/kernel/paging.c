@@ -88,7 +88,7 @@ static void *paging_temp_map(uint64_t physaddr)
  * Map a 4K page starting at virtual memory address `virtaddr` to physical memory address `physaddr`.
  * NOTE: Doesn't invalidate pages or flush TLB, so do it yourself.
  */
-static void map_page(uint64_t virtaddr, uint64_t physaddr)
+static void paging_map_page(uint64_t virtaddr, uint64_t physaddr)
 {
     uint64_t *pdpt;
     uint64_t *pd;
@@ -172,7 +172,7 @@ static void paging_remap_lfb(struct mb2_info *mb2_info)
     for (uint64_t physaddr = tag_fb->framebuffer.addr;
          physaddr < tag_fb->framebuffer.addr + fb_size;
          physaddr += PAGE_SIZE, virtaddr += PAGE_SIZE) {
-        map_page(virtaddr, physaddr);
+        paging_map_page(virtaddr, physaddr);
     }
     printf("Done.\n");
 }
@@ -243,7 +243,7 @@ void paging_init(struct mb2_info *mb2_info)
                block->limit - block->base);
         for (uint64_t physaddr = block->base; physaddr < block->limit;
              physaddr += PAGE_SIZE, linear_limit += PAGE_SIZE) {
-            map_page(linear_limit, physaddr);
+            paging_map_page(linear_limit, physaddr);
         }
     }
     printf("Done.\n");
