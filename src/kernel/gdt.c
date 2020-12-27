@@ -88,6 +88,8 @@ void gdt_init()
     };
     lgdt(&gdtr);
 
+    gdt_rst();
+
     // Check loaded GDTR
     struct dtr loaded_gdtr = {
         .limit = 0xffff,

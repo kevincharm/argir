@@ -1,47 +1,64 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <string.h>
 #include <kernel/cpu.h>
 #include <kernel/interrupts.h>
 #include <kernel/pic.h>
 
 #define IDT_DEFAULT_ISR_HANDLER(n)                                             \
     extern void isr##n(void);                                                  \
-    set_interrupt_desc(n, (uint32_t)isr##n);
+    set_interrupt_desc(n, isr##n);
 
+extern void isr_systick(void);
 extern void isr_stub(void);
 extern void keyboard_irq_handler(void);
 
-void isr_handler(struct interrupt_frame frame)
+/**
+ * Generic ISR.
+ * TODO: Use separate ISRs instead of single ISR + branching.
+ */
+void isr_handler(struct interrupt_frame *frame)
 {
-    if (frame.int_no == 33) {
+    if (frame->int_no == 0x21) {
         keyboard_irq_handler();
     }
 
-    pic_eoi(frame.int_no);
+    // Send an EOI iff (!!) this ISR was triggered by an IRQ
+    // IRQ 0-7 from PIC1 = [0x20, 0x28)
+    // IRQ 8-15 from PIC2 = [0x28, 0x30)
+    if (frame->int_no >= 0x20 && frame->int_no < 0x30) {
+        pic_eoi(frame->int_no);
+    }
 }
 
 /**
  * Stub handler.
  */
-void isr_stub_handler(struct interrupt_frame frame)
+void isr_stub_handler(struct interrupt_frame *frame)
 {
-    (void)frame;
-    printf("IRQ stub handler called!\n");
+    printf("IRQ stub handler called! (int_no: 0x%x)\n", frame->int_no);
 }
 
 void interrupts_init()
 {
+    // Initialise the IDT
+    for (size_t i = 0; i < IDT_ENTRIES_COUNT; i++)
+        memset(&idt[i], 0, sizeof(struct gate_desc));
+
+    // Remap PIC, leaves all IRQs masked.
+    pic_remap();
+
     // Intel-reserved interrupts
     printf("Installing ISRs...\n");
-    IDT_DEFAULT_ISR_HANDLER(0);
-    IDT_DEFAULT_ISR_HANDLER(1);
-    IDT_DEFAULT_ISR_HANDLER(2);
-    IDT_DEFAULT_ISR_HANDLER(3);
-    IDT_DEFAULT_ISR_HANDLER(4);
-    IDT_DEFAULT_ISR_HANDLER(5);
-    IDT_DEFAULT_ISR_HANDLER(6);
-    IDT_DEFAULT_ISR_HANDLER(7);
-    IDT_DEFAULT_ISR_HANDLER(8);
+    IDT_DEFAULT_ISR_HANDLER(0); // #DE (Div-by-zero)
+    IDT_DEFAULT_ISR_HANDLER(1); // #DB (Debug trap)
+    IDT_DEFAULT_ISR_HANDLER(2); // NMI
+    IDT_DEFAULT_ISR_HANDLER(3); // #BP (Breakpoint)
+    IDT_DEFAULT_ISR_HANDLER(4); // #OF (Overflow)
+    IDT_DEFAULT_ISR_HANDLER(5); // #BR (Out-of-bounds)
+    IDT_DEFAULT_ISR_HANDLER(6); // #UD (Undefined instruction)
+    IDT_DEFAULT_ISR_HANDLER(7); // #NM (Device not available)
+    IDT_DEFAULT_ISR_HANDLER(8); // #DF (Double Fault)
     IDT_DEFAULT_ISR_HANDLER(9);
     IDT_DEFAULT_ISR_HANDLER(10);
     IDT_DEFAULT_ISR_HANDLER(11);
@@ -65,18 +82,16 @@ void interrupts_init()
     IDT_DEFAULT_ISR_HANDLER(29);
     IDT_DEFAULT_ISR_HANDLER(30);
     IDT_DEFAULT_ISR_HANDLER(31);
+    set_interrupt_desc(32, isr_systick); // IRQ0: Timer
+    IDT_DEFAULT_ISR_HANDLER(33); // IRQ1: PS/2 Keyboard
 
     // Redirect the rest of the IDT entries to the isr stub handler as a sane default
-    for (size_t i = 0; i < 256; i++) {
+    for (size_t i = 34; i < 256; i++) {
         set_interrupt_desc(i, isr_stub);
     }
 
-    // Remap PIC
-    pic_remap();
-
-    // Enable IRQ1 (PS/2)
-    IDT_DEFAULT_ISR_HANDLER(33);
-    pic_irq_on(1);
+    // Unmask the hardware IRQs we want to know about
+    pic_enable_all_irqs();
 
     idt_init();
 }

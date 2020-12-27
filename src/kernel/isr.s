@@ -42,36 +42,61 @@
 .macro ISR_WRAPPER int_no
     .global isr\int_no
     isr\int_no:
-        push $\int_no      # int_no
+        push $0             # Push a dummy err code so we can use the same interrupt frame struct
+        push $\int_no       # Interrupt number
         PUSHA
+
+        # SysV ABI: Clear the string direction flag on interrupt
         cld
+
+        # Call the generic ISR
+        mov %rsp, %rdi      # 1st arg <- sp (pointer to interrupt frame)
         call isr_handler
+
         POPA
-        add $8, %rsp        # SP+(int_no+err_code)
+        add $16, %rsp       # We also pushed: dummy err code, interrupt number
         iretq
 .endm
 
 .macro ISR_WRAPPER_WITH_ERR int_no
     .global isr\int_no
     isr\int_no\():
-        push $0            # err_code
-        push $\int_no      # int_no
+        # !!! CPU pushes an error code here !!!
+        push $\int_no       # int_no
         PUSHA
+
+        # SysV ABI: Clear the string direction flag on interrupt
         cld
+
+        mov %rsp, %rdi      # 1st arg <- sp (pointer to interrupt frame)
         call isr_handler
+
         POPA
-        add $16, %rsp        # SP+(int_no+err_code)
+        add $16, %rsp       # The processor pushed an err code, we pushed an interrupt number
         iretq
 .endm
 
 .global isr_systick
 isr_systick:
-    iret
+    # Systick is IRQ0, so send an EOI (¡muy importante!)
+    mov $0x20, %rdi
+    call pic_eoi
+    iretq
 
 .global isr_stub
 isr_stub:
+    push $0xff              # dummy err code
+    push $0xff              # dummy int_no
+    PUSHA
+
+    cld
+
+    mov %rsp, %rdi
     call isr_stub_handler
-    iret
+
+    POPA
+    add $16, %rsp
+    iretq
 
 ISR_WRAPPER 0
 ISR_WRAPPER 1

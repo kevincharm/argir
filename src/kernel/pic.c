@@ -23,18 +23,23 @@ void pic_eoi(unsigned int int_no)
 
 void pic_remap()
 {
+    // Start init sequence followed by 3 bytes
     outb(PIC1_PORT_CMD, 0x11);
     outb(PIC2_PORT_CMD, 0x11);
 
+    // PIC offsets
     outb(PIC1_PORT_DATA, 0x20); // PIC1 -> 32
     outb(PIC2_PORT_DATA, 0x28); // PIC2 -> 40
 
-    outb(PIC1_PORT_DATA, 0x04);
-    outb(PIC2_PORT_DATA, 0x02);
+    // Configure chaining PIC1->PIC2
+    outb(PIC1_PORT_DATA, 0x04); // Slave PIC at IRQ2 (0b100)
+    outb(PIC2_PORT_DATA, 0x02); // Slave PIC identity (0b10)
 
-    outb(PIC1_PORT_DATA, 0x05);
+    // 8086 mode.
+    outb(PIC1_PORT_DATA, 0x01);
     outb(PIC2_PORT_DATA, 0x01);
 
+    // Mask all IRQs.
     outb(PIC1_PORT_DATA, 0xff);
     outb(PIC2_PORT_DATA, 0xff);
 }
@@ -43,6 +48,12 @@ void pic_enable_only_keyboard()
 {
     outb(PIC1_PORT_DATA, 0xfd);
     outb(PIC2_PORT_DATA, 0xff);
+}
+
+void pic_enable_all_irqs()
+{
+    outb(PIC1_PORT_DATA, 0x00);
+    outb(PIC2_PORT_DATA, 0x00);
 }
 
 void pic_irq_off(unsigned int irq_no)

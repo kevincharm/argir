@@ -73,7 +73,7 @@ struct dtr {
     volatile uint64_t base;
 } __attribute__((packed));
 
-struct gen_seg_desc gdt[GDT_ENTRIES_COUNT];
+struct gen_seg_desc gdt[GDT_ENTRIES_COUNT] __attribute__((align(4096)));
 
 void gdt_load();
 void gdt_init();
@@ -108,7 +108,7 @@ struct gate_desc {
     uint64_t reserved_2 : 32;
 } __attribute__((__packed__));
 
-struct gate_desc idt[IDT_ENTRIES_COUNT];
+struct gate_desc idt[IDT_ENTRIES_COUNT] __attribute__((align(4096)));
 
 /**
  * Register an interrupt handler with address `base`.

@@ -13,7 +13,7 @@ DOCKER_SH=docker run -it --rm \
 AS=x86_64-elf-as
 CC=x86_64-elf-gcc
 LD=x86_64-elf-ld
-CFLAGS=-m64 -std=gnu11 -ffreestanding -fno-stack-protector -O2 -nostdlib -Wall -Wextra -mcmodel=large -mno-red-zone \
+CFLAGS=-m64 -std=gnu11 -ffreestanding -fno-stack-protector -O2 -nostdlib -Wall -Wextra -mcmodel=kernel -mno-red-zone \
 	-mgeneral-regs-only -mno-mmx -mno-sse -mno-sse2 -mno-avx
 
 # Build info
@@ -28,6 +28,7 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/mb2.o \
 	$(SRC_DIR)/kernel/font_vga.o \
 	$(SRC_DIR)/kernel/gdt.o \
+	$(SRC_DIR)/kernel/gdt_rst.o \
 	$(SRC_DIR)/kernel/pic.o \
 	$(SRC_DIR)/kernel/idt.o \
 	$(SRC_DIR)/kernel/interrupts.o \
@@ -35,12 +36,17 @@ KERNEL_OBJS=\
 	$(SRC_DIR)/kernel/keyboard.o \
 	$(SRC_DIR)/kernel/terminal.o \
 	$(SRC_DIR)/kernel/pci.o \
+	$(SRC_DIR)/kernel/pmem.o \
+	$(SRC_DIR)/kernel/paging.o \
 	$(SRC_DIR)/kernel.o
+
 
 KLIB_DIR=$(SRC_DIR)/klib
 KLIB_INCLUDE=$(KLIB_DIR)/include
 KLIB_OBJS=\
 	$(KLIB_DIR)/memory/memset.o \
+	$(KLIB_DIR)/memory/memcpy.o \
+	$(KLIB_DIR)/algo/qsort.o \
 	$(KLIB_DIR)/ringbuf/ringbuf.o \
 	$(KLIB_DIR)/stdio/putchar.o \
 	$(KLIB_DIR)/stdio/printf.o \
@@ -61,9 +67,11 @@ argir.bin: $(KERNEL_OBJS) $(KLIB_OBJS)
 %.o: %.s
 	$(AS) $< -o $@
 
+%.o: %.S
+	$(CC) -c $< -o $@ -I$(KERNEL_INCLUDE)
+
 %.o: %.c
-	$(CC) $(CFLAGS) -c $< -o $@ \
-	-I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) -D$(KERNEL_DEFINES)
+	$(CC) $(CFLAGS) -c $< -o $@ -I$(KLIB_INCLUDE) -I$(KERNEL_INCLUDE) -D$(KERNEL_DEFINES)
 
 # Disk image & Qemu
 argir.iso: argir.bin
@@ -73,7 +81,7 @@ argir.iso: argir.bin
 	cp $(CONFIG_DIR)/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	grub-mkrescue -o argir.iso iso
 
-QEMU=qemu-system-x86_64 -cdrom argir.iso -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d int,cpu_reset -no-reboot
+QEMU=qemu-system-x86_64 -cdrom argir.iso -m 4G -netdev user,id=eth0 -device ne2k_pci,netdev=eth0 -monitor stdio -d int,cpu_reset -no-reboot -D ./tmp/qemu.log
 
 run: all
 	$(QEMU)
@@ -96,4 +104,4 @@ sections:
 	greadelf -S $(ISO_DIR)/boot/argir.bin
 
 objdump:
-	objdump -x $(ISO_DIR)/boot/argir.bin
+	objdump -dx $(ISO_DIR)/boot/argir.bin
