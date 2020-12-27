@@ -17,31 +17,29 @@
     ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS + PDE_BITS + PDPTE_BITS)) &  \
      0x1ff)
 #define PDPT_INDEX(linear_addr)                                                \
-    ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS + PDE_BITS)) & 0x3ffff)
+    ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS + PDE_BITS)) & 0x1ff)
 #define PD_INDEX(linear_addr)                                                  \
-    ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS)) & 0x7ffffff)
-#define PT_INDEX(linear_addr)                                                  \
-    ((linear_addr >> PAGE_OFFSET_BITS) & 0xffffffffful)
-
-// Page table virtual addresses from recursive mapping @PML4[510]
-#define PML4_ADDR ((uint64_t *)0xffffff7fbfdfe000ull)
-#define PDPT_ADDR ((uint64_t *)0xffffff7fbfc00000ull)
-#define PD_ADDR ((uint64_t *)0xffffff7f80000000ull)
-#define PT_ADDR ((uint64_t *)0xffffff0000000000ull)
-// Get page table entry pointers
-#define PML4_ENTRY(linear_addr) PML4_ADDR[PML4_INDEX(linear_addr)]
-#define PDPT_ENTRY(linear_addr) PDPT_ADDR[PDPT_INDEX(linear_addr)]
-#define PD_ENTRY(linear_addr) PD_ADDR[PD_INDEX(linear_addr)]
-#define PT_ENTRY(linear_addr) PT_ADDR[PT_INDEX(linear_addr)]
-
+    ((linear_addr >> (PAGE_OFFSET_BITS + PTE_BITS)) & 0x1ff)
+#define PT_INDEX(linear_addr) ((linear_addr >> PAGE_OFFSET_BITS) & 0x1ff)
+#define PAGE_OFF(linear_addr) ((linear_addr & 0xfff))
 // Get actual physical address from a PML4/PDPT/PD/PT entry (ignore lower 12-bits)
-#define PML4E_TO_ADDR(addr) (addr & 0xfffffffffffff000)
+#define PML4E_TO_ADDR(addr) (addr & 0xfffffffffffff000ull)
+#define PML4E_TO_HIGH_ADDR(addr) (PML4E_TO_ADDR(addr) + KERNEL_VMA)
 // PD or PT entry bits
 #define PDE_HUGE (1 << 7)
 #define PTE_PRESENT (1 << 0)
 #define PTE_READWRITE (1 << 1)
 
 uint64_t kernel_pml4[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t kernel_pdpt0[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t kernel_pd0[512]
+    __attribute__((aligned(PAGE_SIZE))); // [0, 1G); kernel code
+uint64_t kernel_pd1[512]
+    __attribute__((aligned(PAGE_SIZE))); // [1G, 2G); kernel code
+uint64_t kernel_pd2[512]
+    __attribute__((aligned(PAGE_SIZE))); // [2G, 3G); TODO: still needed?
+uint64_t kernel_pd3[512]
+    __attribute__((aligned(PAGE_SIZE))); // [3G, 4G); TODO: still needed?
 
 uint64_t linear_limit = 0;
 
@@ -53,58 +51,76 @@ static inline void invlpg(uint64_t virtaddr)
     __asm__ volatile("invlpg (%0)" ::"r"(virtaddr) : "memory");
 }
 
+#define TEMP_MAP_ADDR (0xffffffffffe00000ull) // -2M, mapped as part of kernel
+
+static void *paging_temp_map(uint64_t physaddr)
+{
+    // Align physaddr down to a 2M boundary (kernel is mapped to hugepages)
+    uint64_t rem = physaddr % 0x200000;
+    physaddr -= rem;
+
+    kernel_pd1[511] =
+        physaddr | PDE_HUGE | PTE_PRESENT |
+        PTE_READWRITE; // virtual -2M maps to last entry in PML4_511->PDPT_511->PD_1
+
+    uint64_t virtaddr = TEMP_MAP_ADDR + rem;
+    invlpg(virtaddr);
+    return virtaddr;
+}
+
+static void paging_unmap_temp()
+{
+    kernel_pd1[511] = 0;
+    invlpg(TEMP_MAP_ADDR);
+}
+
 /**
  * Map a 4K page starting at virtual memory address `virtaddr` to physical memory address `physaddr`.
  */
 static void map_page(uint64_t virtaddr, uint64_t physaddr)
 {
-    uint64_t pdpt;
-    uint64_t pd;
-    uint64_t pt;
-    if (!(PML4_ENTRY(virtaddr) & PTE_PRESENT)) {
+    uint64_t *pdpt;
+    uint64_t *pd;
+    uint64_t *pt;
+    if (!(kernel_pml4[PML4_INDEX(virtaddr)] & PTE_PRESENT)) {
         // Allocate and init an empty PDPT for this PML4E
         pdpt = pmem_alloc_page();
-        // printf("Mapped PML4[%x] <- %x\n", PML4_INDEX(virtaddr), pdpt);
         // Point this PML4E -> newly alloc'd PDPT
-        PML4_ENTRY(virtaddr) = pdpt | PTE_PRESENT | PTE_READWRITE;
-        invlpg(PDPT_ENTRY(virtaddr));
+        kernel_pml4[PML4_INDEX(virtaddr)] =
+            (uint64_t)pdpt | PTE_PRESENT | PTE_READWRITE;
+        // Map the pdpt to a virt addr so we can access it
+        uint64_t *v_pdpt = paging_temp_map(pdpt);
+        for (size_t e = 0; e < 512; e++)
+            v_pdpt[e] = 0;
     }
+    pdpt = PML4E_TO_HIGH_ADDR(kernel_pml4[PML4_INDEX(virtaddr)]);
+    /// DEBUG: Temporarily map this address so that it is accessible
     // Ensure PDPT entry has been allocated
-    if (!(PDPT_ENTRY(virtaddr) & PTE_PRESENT)) {
+    if (!(pdpt[PDPT_INDEX(virtaddr)] & PTE_PRESENT)) {
         // Allocate and init an empty PD for this PDPTE
         pd = pmem_alloc_page();
-        // printf("Mapped PDPT[%x] <- %x\n", PDPT_INDEX(virtaddr), pd);
         // Point this PDPTE -> newly alloc'd PD
-        PDPT_ENTRY(virtaddr) = pd | PTE_PRESENT | PTE_READWRITE;
-        invlpg(PD_ENTRY(virtaddr));
+        pdpt[PDPT_INDEX(virtaddr)] = (uint64_t)pd | PTE_PRESENT | PTE_READWRITE;
+        // Map the pd to a virt addr so we can access it
+        uint64_t *v_pd = paging_temp_map(pd);
+        for (size_t e = 0; e < 512; e++)
+            v_pd[e] = 0;
     }
+    pd = PML4E_TO_HIGH_ADDR(pdpt[PDPT_INDEX(virtaddr)]);
     // Ensure PD entry has been allocated
-    if (!(PD_ENTRY(virtaddr) & PTE_PRESENT)) {
+    if (!(pd[PD_INDEX(virtaddr)] & PTE_PRESENT)) {
         // Allocate and init an empty PT for this PDE
         pt = pmem_alloc_page();
-        // printf("Mapped PD[%x] <- %x\n", PD_INDEX(virtaddr), pt);
         // Point this PDE -> newly alloc'd PT
-        PD_ENTRY(virtaddr) = pt | PTE_PRESENT | PTE_READWRITE;
-        invlpg(PT_ENTRY(virtaddr));
+        pd[PD_INDEX(virtaddr)] = (uint64_t)pt | PTE_PRESENT | PTE_READWRITE;
+        // Map the pd to a virt addr so we can access it
+        uint64_t *v_pt = paging_temp_map(pt);
+        for (size_t e = 0; e < 512; e++)
+            v_pt[e] = 0;
     }
-    if (PT_ENTRY(virtaddr) & PTE_PRESENT) {
-        printf("--- FATAL ---\n");
-        printf("PML4[%u] = 0x%x\n", PML4_INDEX(virtaddr), PML4_ENTRY(virtaddr));
-        printf("PDPT[%u] = 0x%x\n", PDPT_INDEX(virtaddr), PDPT_ENTRY(virtaddr));
-        printf("PD[%u] = 0x%x\n", PD_INDEX(virtaddr), PD_ENTRY(virtaddr));
-        printf("PT[%u] = 0x%x\n", PT_INDEX(virtaddr), PT_ENTRY(virtaddr));
-        printf("FATAL: Entry for 0x%x is already occupied!\n\n", virtaddr);
-        __asm__ volatile("mov $0xdeadbeefdeadbeef, %rax\n\t"
-                         "1: jmp 1b");
-        return;
-    }
-
-    // printf("SET 0x%x -> PT[%u] = 0x%x\n\n", virtaddr, PT_INDEX(virtaddr),
-    //        physaddr);
-    PT_ENTRY(virtaddr) =
-        (physaddr & 0xffffffffff000ull) | PTE_PRESENT | PTE_READWRITE;
-    __asm__ volatile("mov %0, %%rax\n\t" ::"m"(virtaddr));
-    invlpg(virtaddr);
+    pt = PML4E_TO_HIGH_ADDR(pd[PD_INDEX(virtaddr)]);
+    // printf("PT addr: %x ... idx: %u\n", pt, PT_INDEX(virtaddr));
+    pt[PT_INDEX(virtaddr)] = physaddr | PTE_PRESENT | PTE_READWRITE;
 }
 
 static void paging_flush_tlb()
@@ -154,17 +170,14 @@ static void paging_remap_lfb(struct mb2_info *mb2_info)
 void paging_init(struct mb2_info *mb2_info)
 {
     // Drop identity (0-4G), remap LFB to -3G
-    printf("PML4[0] = 0x%x\n", PML4_ENTRY(0));
-    /// DEBUG: This should unmap the kernel from -2G and cause a triple fault, but it doesn't!
-    PML4_ENTRY(KERNEL_VMA) = 0;
-    /// DEBUG: When ref'd directly, it does cause a crash.
-    // kernel_pml4[511] = 0;
-    paging_flush_tlb();
+    // uint64_t *test = TEMP_MAP_ADDR;
+    // uint64_t *test = paging_temp_map(0x7fd00000);
+    // uint64_t *test = kernel_pd1 + 511;
     // __asm__ volatile("mov %0, %%rax\n\t"
-    //                  "1: jmp 1b" ::"m"(p));
-    __asm__ volatile("1: jmp 1b");
+    //                  "1: jmp 1b" ::"r"(*test));
     paging_remap_lfb(mb2_info);
     paging_flush_tlb();
+    __asm__ volatile("1: jmp 1b");
 
     // Re-initialise LFB with higher-half address
     struct mb2_tag *tag_fb = mb2_find_tag(mb2_info, MB_TAG_TYPE_FRAMEBUFFER);

@@ -15,7 +15,8 @@ size_t usable_pages = 0;
 size_t pmem_current_block = 0;
 
 /**
- * Return an available physical page (initialised with zeros).
+ * Return an available physical page (4K).
+ * NOTE: This returns a 4K-aligned PHYSICAL address.
  */
 void *pmem_alloc_page()
 {
@@ -28,7 +29,7 @@ void *pmem_alloc_page()
         if (pmem_current_block < 0) {
             /// TODO: PANIC
             printf("Out of physical memory!\n");
-            __asm__ volatile("hlt");
+            __asm__ volatile("1: jmp 1b");
             return;
         }
 

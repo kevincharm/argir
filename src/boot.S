@@ -43,21 +43,14 @@ mb2_header_end:
 # Identity-mapped paging for first 4G of physical memory.
 # Bottom 2G is also duplicately mapped at -2G (higher-half).
 .extern kernel_pml4
-// kernel_pml4:
-//     .skip 0x1000
-pdpt0:
-    .skip 0x1000
+.extern kernel_pdpt0
 # Since we're using hugepages, each PD entry (8B) points to a 2M page.
 # -> Each PD holds 0x1000 / 8 = 512 entries.
 # -> Each PD maps 512 * 2M = 2^30 = 1GiB of memory.
-pd0:
-    .skip 0x1000
-pd1:
-    .skip 0x1000
-pd2:
-    .skip 0x1000
-pd3:
-    .skip 0x1000
+.extern kernel_pd0
+.extern kernel_pd1
+.extern kernel_pd2
+.extern kernel_pd3
 .align 4
 stack_bottom:
     .skip 16384
@@ -116,10 +109,10 @@ _start:
     rep stosl
 
     # Build PML4[0]->PDPT (Page Descriptor Pointer Table)
-    mov $(pdpt0 - KERNEL_VMA), %eax
+    mov $(kernel_pdpt0 - KERNEL_VMA), %eax
     or $0x3, %eax
     mov %eax, (kernel_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0 (Identity map)
-    mov %eax, (kernel_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->PDPT0 (Higher-half map at -2G)
+    mov %eax, (kernel_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->kernel_pdpt0 (Higher-half map at -2G)
 
     # Recursive map @PML4[510] -> [0xffffff0000000000, 0xffffff8000000000)
     mov (kernel_pml4 - KERNEL_VMA), %eax
@@ -127,17 +120,17 @@ _start:
     mov %eax, (kernel_pml4 + (510 * 8) - KERNEL_VMA)
 
     ### Build PD0 (0 - 1G) ###
-    mov $(pd0 - KERNEL_VMA), %eax
+    mov $(kernel_pd0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt0 - KERNEL_VMA)                  # PDPT0[0]->PD0
-    mov %eax, (pdpt0 + (510 * 8) - KERNEL_VMA)      # PDPT0[510]->PD0 (Higher-half duplicate mapping)
+    mov %eax, (kernel_pdpt0 - KERNEL_VMA)                  # PDPT0[0]->PD0
+    mov %eax, (kernel_pdpt0 + (510 * 8) - KERNEL_VMA)      # PDPT0[510]->PD0 (Higher-half duplicate mapping)
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
     mov $0x200000, %eax                             # Each huge page is 2M
     mul %ecx                                        # Multiply by counter to calculate page offset
     or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (pd0 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
+    mov %eax, (kernel_pd0 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                                           # Loop until 512 entries filled for this PD
@@ -149,10 +142,10 @@ _start:
     jne boot_err
 
     ### Build PD1 (1G - 2G) ###
-    mov $(pd1 - KERNEL_VMA), %eax
+    mov $(kernel_pd1 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt0 + 8 - KERNEL_VMA)              # PDPT0[1]->PD1
-    mov %eax, (pdpt0 + (511 * 8) - KERNEL_VMA)      # PDPT0[511]->PD1 (Higher-half duplicate mapping)
+    mov %eax, (kernel_pdpt0 + 8 - KERNEL_VMA)              # PDPT0[1]->PD1
+    mov %eax, (kernel_pdpt0 + (511 * 8) - KERNEL_VMA)      # PDPT0[511]->PD1 (Higher-half duplicate mapping)
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -160,7 +153,7 @@ _start:
     mul %ecx                                        # Multiply by counter to calculate local page offset
     add $0x40000000, %eax                           # This PD starts at 1G
     or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (pd1 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
+    mov %eax, (kernel_pd1 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                                           # Loop until 512 entries filled for this PD
@@ -173,9 +166,9 @@ _start:
     jne boot_err
 
     ### Build PD2 (2G - 3G) ###
-    mov $(pd2 - KERNEL_VMA), %eax
+    mov $(kernel_pd2 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt0 + 16 - KERNEL_VMA)             # PDPT0[2]->PD2
+    mov %eax, (kernel_pdpt0 + 16 - KERNEL_VMA)             # PDPT0[2]->PD2
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -183,7 +176,7 @@ _start:
     mul %ecx                                        # Multiply by counter to calculate page offset
     add $0x80000000, %eax                           # This PD starts at 2G
     or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (pd2 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
+    mov %eax, (kernel_pd2 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                                           # Loop until 512 entries filled for this PD
@@ -196,9 +189,9 @@ _start:
     jne boot_err
 
     ### Build PD3 (3G - 4G) ###
-    mov $(pd3 - KERNEL_VMA), %eax
+    mov $(kernel_pd3 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (pdpt0 + 24 - KERNEL_VMA)             # PDPT0[3]->PD3
+    mov %eax, (kernel_pdpt0 + 24 - KERNEL_VMA)             # PDPT0[3]->PD3
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -206,7 +199,7 @@ _start:
     mul %ecx                                        # Multiply by counter to calculate page offset
     add $0xc0000000, %eax                           # This PD starts at 3G
     or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (pd3 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
+    mov %eax, (kernel_pd3 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                                           # Loop until 512 entries filled for this PD
