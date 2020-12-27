@@ -42,15 +42,17 @@ mb2_header_end:
 .align 0x1000
 # Identity-mapped paging for first 4G of physical memory.
 # Bottom 2G is also duplicately mapped at -2G (higher-half).
-.extern kernel_pml4
-.extern kernel_pdpt0
+boot_pml4:
+    .skip 0x1000
+boot_pdpt0:
+    .skip 0x1000
 # Since we're using hugepages, each PD entry (8B) points to a 2M page.
 # -> Each PD holds 0x1000 / 8 = 512 entries.
 # -> Each PD maps 512 * 2M = 2^30 = 1GiB of memory.
-.extern kernel_pd0
-.extern kernel_pd1
-.extern kernel_pd2
-.extern kernel_pd3
+boot_pd0:
+    .skip 0x1000
+boot_pd1:
+    .skip 0x1000
 .align 4
 stack_bottom:
     .skip 16384
@@ -101,7 +103,7 @@ _start:
     mov %eax, (mb2_magic - KERNEL_VMA)
 
     # Now we setup paging.
-    mov $(kernel_pml4 - KERNEL_VMA), %edi
+    mov $(boot_pml4 - KERNEL_VMA), %edi
     # Zero-out PML4 (1024 * 4B = 4096B)
     mov $1024, %ecx
     xor %eax, %eax
@@ -109,28 +111,28 @@ _start:
     rep stosl
 
     # Build PML4[0]->PDPT (Page Descriptor Pointer Table)
-    mov $(kernel_pdpt0 - KERNEL_VMA), %eax
+    mov $(boot_pdpt0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (kernel_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0 (Identity map)
-    mov %eax, (kernel_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->kernel_pdpt0 (Higher-half map at -2G)
+    mov %eax, (boot_pml4 - KERNEL_VMA)              # PML4[0]->PDPT0 (Identity map)
+    mov %eax, (boot_pml4 + (511 * 8) - KERNEL_VMA)  # PML4[511]->boot_pdpt0 (Higher-half map at -2G)
 
     # Recursive map @PML4[510] -> [0xffffff0000000000, 0xffffff8000000000)
-    mov (kernel_pml4 - KERNEL_VMA), %eax
+    mov (boot_pml4 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (kernel_pml4 + (510 * 8) - KERNEL_VMA)
+    mov %eax, (boot_pml4 + (510 * 8) - KERNEL_VMA)
 
     ### Build PD0 (0 - 1G) ###
-    mov $(kernel_pd0 - KERNEL_VMA), %eax
+    mov $(boot_pd0 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (kernel_pdpt0 - KERNEL_VMA)                  # PDPT0[0]->PD0
-    mov %eax, (kernel_pdpt0 + (510 * 8) - KERNEL_VMA)      # PDPT0[510]->PD0 (Higher-half duplicate mapping)
+    mov %eax, (boot_pdpt0 - KERNEL_VMA)                  # PDPT0[0]->PD0
+    mov %eax, (boot_pdpt0 + (510 * 8) - KERNEL_VMA)      # PDPT0[510]->PD0 (Higher-half duplicate mapping)
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
     mov $0x200000, %eax                             # Each huge page is 2M
     mul %ecx                                        # Multiply by counter to calculate page offset
     or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (kernel_pd0 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
+    mov %eax, (boot_pd0 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                                           # Loop until 512 entries filled for this PD
@@ -142,10 +144,10 @@ _start:
     jne boot_err
 
     ### Build PD1 (1G - 2G) ###
-    mov $(kernel_pd1 - KERNEL_VMA), %eax
+    mov $(boot_pd1 - KERNEL_VMA), %eax
     or $0x3, %eax
-    mov %eax, (kernel_pdpt0 + 8 - KERNEL_VMA)              # PDPT0[1]->PD1
-    mov %eax, (kernel_pdpt0 + (511 * 8) - KERNEL_VMA)      # PDPT0[511]->PD1 (Higher-half duplicate mapping)
+    mov %eax, (boot_pdpt0 + 8 - KERNEL_VMA)              # PDPT0[1]->PD1
+    mov %eax, (boot_pdpt0 + (511 * 8) - KERNEL_VMA)      # PDPT0[511]->PD1 (Higher-half duplicate mapping)
     # Map page table entries (512 * 2M)
     mov $0, %ecx
 1:
@@ -153,7 +155,7 @@ _start:
     mul %ecx                                        # Multiply by counter to calculate local page offset
     add $0x40000000, %eax                           # This PD starts at 1G
     or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (kernel_pd1 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
+    mov %eax, (boot_pd1 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
     inc %ecx
     cmp $512, %ecx
     jb 1b                                           # Loop until 512 entries filled for this PD
@@ -165,52 +167,6 @@ _start:
     cmp $0x80000000, %eax
     jne boot_err
 
-    ### Build PD2 (2G - 3G) ###
-    mov $(kernel_pd2 - KERNEL_VMA), %eax
-    or $0x3, %eax
-    mov %eax, (kernel_pdpt0 + 16 - KERNEL_VMA)             # PDPT0[2]->PD2
-    # Map page table entries (512 * 2M)
-    mov $0, %ecx
-1:
-    mov $0x200000, %eax                             # Each huge page is 2M
-    mul %ecx                                        # Multiply by counter to calculate page offset
-    add $0x80000000, %eax                           # This PD starts at 2G
-    or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (kernel_pd2 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
-    inc %ecx
-    cmp $512, %ecx
-    jb 1b                                           # Loop until 512 entries filled for this PD
-    ### PD2 sanity check - total mapped should be 3G ###
-    mov $0x200000, %eax
-    mul %ecx
-    add $0x80000000, %eax                           # This PD starts at 2G
-    ### assert eax == 0xc0000000 (3G)
-    cmp $0xc0000000, %eax
-    jne boot_err
-
-    ### Build PD3 (3G - 4G) ###
-    mov $(kernel_pd3 - KERNEL_VMA), %eax
-    or $0x3, %eax
-    mov %eax, (kernel_pdpt0 + 24 - KERNEL_VMA)             # PDPT0[3]->PD3
-    # Map page table entries (512 * 2M)
-    mov $0, %ecx
-1:
-    mov $0x200000, %eax                             # Each huge page is 2M
-    mul %ecx                                        # Multiply by counter to calculate page offset
-    add $0xc0000000, %eax                           # This PD starts at 3G
-    or $0b10000011, %eax                            # Set flags PRESENT | WRITABLE
-    mov %eax, (kernel_pd3 - KERNEL_VMA)(,%ecx,8)           # Load calc'd page offset into nth PD entry
-    inc %ecx
-    cmp $512, %ecx
-    jb 1b                                           # Loop until 512 entries filled for this PD
-    ### PD3 sanity check - total mapped should be 4G ###
-    mov $0x200000, %eax
-    mul %ecx
-    add $0xc0000000, %eax                           # This PD starts at 3G
-    ### assert eax == 0x100000000 (4G)
-    cmp $0x100000000, %eax                          # Yes, this is an overflow.
-    jne boot_err
-
     # Load empty IDT
     lidt empty_idt - KERNEL_VMA
 
@@ -220,7 +176,7 @@ _start:
     mov %eax, %cr4
 
     # Load our PML4 (flushes TLB)
-    mov $(kernel_pml4 - KERNEL_VMA), %eax
+    mov $(boot_pml4 - KERNEL_VMA), %eax
     mov %eax, %cr3
 
     # We need to write to the MSR to set the LME (Long Mode Enable) bit.
@@ -278,9 +234,9 @@ _start64_higherhalf:
 
     # Drop identity map
     mov $0, %eax
-    mov %eax, (kernel_pml4)              # PML4[0]->PDPT0 (Identity map)
+    mov %eax, (boot_pml4)              # PML4[0]->PDPT0 (Identity map)
     # Reload PML4, flush TLB
-    mov $(kernel_pml4 - KERNEL_VMA), %rax
+    mov $(boot_pml4 - KERNEL_VMA), %rax
     mov %rax, %cr3
 
     call kernel_main

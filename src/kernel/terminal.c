@@ -114,6 +114,8 @@ void terminal_clear()
             vga_text_set(x, y, ' ');
         }
     }
+    term->row = 0;
+    term->col = 0;
 }
 
 void terminal_write(const char *str)

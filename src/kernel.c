@@ -24,20 +24,16 @@ static void print_build_info();
 void kernel_main(void)
 {
     interrupts_disable();
+
+    // MB2 boot info check
     if (mb2_magic != 0x36d76289) {
         __asm__ volatile("mov $0xbaaaaaadb0000007, %rax\n\t"
                          "hlt"); // MB2 did not drop us here!
     }
+    // Calculate higher-half MB2 boot info address
     uint64_t mb2_info_vma = (uint64_t)mb2_info + KERNEL_VMA;
-    // Extract required info from MB2 bootinfo before it disappears
-    struct mb2_tag *mb2_tag_fb = mb2_find_tag(mb2_info_vma, 8);
-    size_t width = mb2_tag_fb->framebuffer.width;
-    size_t height = mb2_tag_fb->framebuffer.height;
-    size_t pitch = mb2_tag_fb->framebuffer.pitch;
-    /// This works properly! We are using the higher-half mb2_info addr.
-    /// We still need to remap LFB to -3G.
 
-    terminal_init(NULL, width, height, pitch);
+    terminal_init(NULL, 800, 600, 3200); // Dummy null output for printfs
     pmem_init(mb2_info_vma);
     print_build_info();
 

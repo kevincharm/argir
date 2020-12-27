@@ -1,6 +1,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <memory.h>
 #include "kernel/addr.h"
 #include "kernel/paging.h"
 #include "kernel/terminal.h"
@@ -30,15 +31,23 @@
 #define PTE_PRESENT (1 << 0)
 #define PTE_READWRITE (1 << 1)
 
+#define TO_LOWER_HALF(virtaddr) ((uint64_t)virtaddr - KERNEL_VMA)
+
 uint64_t kernel_pml4[512] __attribute__((aligned(PAGE_SIZE)));
 uint64_t kernel_pdpt0[512] __attribute__((aligned(PAGE_SIZE)));
-uint64_t kernel_pd0[512]
+/// -2G
+uint64_t kernel_pd0[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t kernel_pd0_pt[512 * 512]
     __attribute__((aligned(PAGE_SIZE))); // [0, 1G); kernel code
-uint64_t kernel_pd1[512]
+uint64_t kernel_pd1[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t kernel_pd1_pt[512 * 512]
     __attribute__((aligned(PAGE_SIZE))); // [1G, 2G); kernel code
-uint64_t kernel_pd2[512]
+/// -4G
+uint64_t kernel_pd2[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t kernel_pd2_pt[512 * 512]
     __attribute__((aligned(PAGE_SIZE))); // [2G, 3G); TODO: still needed?
-uint64_t kernel_pd3[512]
+uint64_t kernel_pd3[512] __attribute__((aligned(PAGE_SIZE)));
+uint64_t kernel_pd3_pt[512 * 512]
     __attribute__((aligned(PAGE_SIZE))); // [3G, 4G); TODO: still needed?
 
 uint64_t linear_limit = 0;
@@ -51,31 +60,40 @@ static inline void invlpg(uint64_t virtaddr)
     __asm__ volatile("invlpg (%0)" ::"r"(virtaddr) : "memory");
 }
 
-#define TEMP_MAP_ADDR (0xffffffffffe00000ull) // -2M, mapped as part of kernel
-
-static void *paging_temp_map(uint64_t physaddr)
+/**
+ * Reload PML4 in CR3.
+ */
+static void paging_flush_tlb()
 {
-    // Align physaddr down to a 2M boundary (kernel is mapped to hugepages)
-    uint64_t rem = physaddr % 0x200000;
-    physaddr -= rem;
-
-    kernel_pd1[511] =
-        physaddr | PDE_HUGE | PTE_PRESENT |
-        PTE_READWRITE; // virtual -2M maps to last entry in PML4_511->PDPT_511->PD_1
-
-    uint64_t virtaddr = TEMP_MAP_ADDR + rem;
-    invlpg(virtaddr);
-    return virtaddr;
+    uint64_t pml4;
+    __asm__ volatile("movq %%cr3, %0" : "=r"(pml4));
+    __asm__ volatile("movq %0, %%cr3" ::"r"(pml4) : "memory");
 }
+
+#define TEMP_MAP_ADDR (KERNEL_VMA) // Reclaim first 4K, mapped as part of kernel
 
 static void paging_unmap_temp()
 {
-    kernel_pd1[511] = 0;
+    kernel_pd0_pt[0] = 0;
     invlpg(TEMP_MAP_ADDR);
 }
 
 /**
+ * Map 4K page at TEMP_MAP_ADDR
+ */
+static void *paging_temp_map(uint64_t physaddr)
+{
+    paging_unmap_temp();
+
+    kernel_pd0_pt[0] = PML4E_TO_ADDR(physaddr) | PTE_PRESENT |
+                       PTE_READWRITE; // first 4K page of kernel
+    invlpg(TEMP_MAP_ADDR);
+    return TEMP_MAP_ADDR;
+}
+
+/**
  * Map a 4K page starting at virtual memory address `virtaddr` to physical memory address `physaddr`.
+ * NOTE: Doesn't invalidate pages or flush TLB, so do it yourself.
  */
 static void map_page(uint64_t virtaddr, uint64_t physaddr)
 {
@@ -93,9 +111,7 @@ static void map_page(uint64_t virtaddr, uint64_t physaddr)
         for (size_t e = 0; e < 512; e++)
             v_pdpt[e] = 0;
     }
-    pdpt = PML4E_TO_HIGH_ADDR(kernel_pml4[PML4_INDEX(virtaddr)]);
-    /// DEBUG: Temporarily map this address so that it is accessible
-    // Ensure PDPT entry has been allocated
+    pdpt = paging_temp_map(kernel_pml4[PML4_INDEX(virtaddr)]);
     if (!(pdpt[PDPT_INDEX(virtaddr)] & PTE_PRESENT)) {
         // Allocate and init an empty PD for this PDPTE
         pd = pmem_alloc_page();
@@ -105,10 +121,17 @@ static void map_page(uint64_t virtaddr, uint64_t physaddr)
         uint64_t *v_pd = paging_temp_map(pd);
         for (size_t e = 0; e < 512; e++)
             v_pd[e] = 0;
+        // Remap the PDPT as we will need to access it again
+        pdpt = paging_temp_map(kernel_pml4[PML4_INDEX(virtaddr)]);
     }
-    pd = PML4E_TO_HIGH_ADDR(pdpt[PDPT_INDEX(virtaddr)]);
+    pd = paging_temp_map(pdpt[PDPT_INDEX(virtaddr)]);
     // Ensure PD entry has been allocated
     if (!(pd[PD_INDEX(virtaddr)] & PTE_PRESENT)) {
+        if (pd[PD_INDEX(virtaddr)] & PDE_HUGE) {
+            // Fatal? Trying to map a 4K page where a hugepage (2M) is already mapped
+            __asm__ volatile("mov $0xbaaaaaadbeeeeeef, %rax\n\t"
+                             "1: jmp 1b");
+        }
         // Allocate and init an empty PT for this PDE
         pt = pmem_alloc_page();
         // Point this PDE -> newly alloc'd PT
@@ -117,17 +140,15 @@ static void map_page(uint64_t virtaddr, uint64_t physaddr)
         uint64_t *v_pt = paging_temp_map(pt);
         for (size_t e = 0; e < 512; e++)
             v_pt[e] = 0;
+        // Remap the PD as we will need to access it again
+        // This is a bit convoluted: PDPT is no longer available,
+        // so we have to consecutively map it from a known mapped address (PML4).
+        pdpt = paging_temp_map(kernel_pml4[PML4_INDEX(virtaddr)]);
+        pd = paging_temp_map(pdpt[PDPT_INDEX(virtaddr)]);
     }
-    pt = PML4E_TO_HIGH_ADDR(pd[PD_INDEX(virtaddr)]);
+    pt = paging_temp_map(pd[PD_INDEX(virtaddr)]);
     // printf("PT addr: %x ... idx: %u\n", pt, PT_INDEX(virtaddr));
     pt[PT_INDEX(virtaddr)] = physaddr | PTE_PRESENT | PTE_READWRITE;
-}
-
-static void paging_flush_tlb()
-{
-    uint64_t pml4;
-    __asm__ volatile("movq %%cr3, %0" : "=r"(pml4));
-    __asm__ volatile("movq %0, %%cr3" ::"r"(pml4) : "memory");
 }
 
 /**
@@ -164,20 +185,54 @@ static void paging_remap_lfb(struct mb2_info *mb2_info)
 }
 
 /**
+ * Remap 2G of kernel code to *4K pages* at higher-half starting at -2G.
+ */
+static void paging_remap_kernel()
+{
+    memset(kernel_pml4, 0, 8 * 512);
+    memset(kernel_pdpt0, 0, 8 * 512);
+    memset(kernel_pd0, 0, 8 * 512);
+    memset(kernel_pd0_pt, 0, 8 * 512 * 512);
+    memset(kernel_pd1, 0, 8 * 512);
+    memset(kernel_pd1_pt, 0, 8 * 512 * 512);
+
+    // Map virtual higher-half addresses starting at -2G to physical addresses [0G, 2G)
+    kernel_pml4[511] =
+        TO_LOWER_HALF((uint64_t)kernel_pdpt0) | PTE_PRESENT | PTE_READWRITE;
+    kernel_pdpt0[510] =
+        TO_LOWER_HALF((uint64_t)kernel_pd0) | PTE_PRESENT | PTE_READWRITE;
+    uint64_t physaddr = 0;
+    // [0G, 1G)
+    for (size_t i = 0; i < 512; i++) {
+        kernel_pd0[i] = TO_LOWER_HALF((uint64_t)(&(kernel_pd0_pt[i * 512]))) |
+                        PTE_PRESENT | PTE_READWRITE;
+        for (size_t j = 0; j < 512; j++, physaddr += 0x1000) {
+            kernel_pd0_pt[i * 512 + j] = physaddr | PTE_PRESENT | PTE_READWRITE;
+        }
+    }
+    // [1G, 2G)
+    for (size_t i = 0; i < 512; i++) {
+        kernel_pd1[i] = TO_LOWER_HALF((uint64_t)(&(kernel_pd1_pt[i * 512]))) |
+                        PTE_PRESENT | PTE_READWRITE;
+        for (size_t j = 0; j < 512; j++, physaddr += 0x1000) {
+            kernel_pd1_pt[i * 512 + j] = physaddr | PTE_PRESENT | PTE_READWRITE;
+        }
+    }
+
+    // Replace the boot PML4
+    uint64_t pml4 = (uint64_t)kernel_pml4 - KERNEL_VMA; // physaddr of new PML4
+    __asm__ volatile("movq %0, %%cr3" ::"r"(pml4) : "memory");
+}
+
+/**
  * Setup paging:
  * mb2_info will NOT be available after this subroutine returns.
  */
 void paging_init(struct mb2_info *mb2_info)
 {
-    // Drop identity (0-4G), remap LFB to -3G
-    // uint64_t *test = TEMP_MAP_ADDR;
-    // uint64_t *test = paging_temp_map(0x7fd00000);
-    // uint64_t *test = kernel_pd1 + 511;
-    // __asm__ volatile("mov %0, %%rax\n\t"
-    //                  "1: jmp 1b" ::"r"(*test));
+    paging_remap_kernel();
     paging_remap_lfb(mb2_info);
     paging_flush_tlb();
-    __asm__ volatile("1: jmp 1b");
 
     // Re-initialise LFB with higher-half address
     struct mb2_tag *tag_fb = mb2_find_tag(mb2_info, MB_TAG_TYPE_FRAMEBUFFER);
@@ -202,4 +257,5 @@ void paging_init(struct mb2_info *mb2_info)
 
     /// Reload CR3 with our new PML4 mapping
     paging_flush_tlb();
+    terminal_clear();
 }
