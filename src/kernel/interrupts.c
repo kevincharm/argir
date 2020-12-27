@@ -92,8 +92,6 @@ void interrupts_init()
 
     // Unmask the hardware IRQs we want to know about
     pic_enable_all_irqs();
-    // pic_enable_only_keyboard();
-    // pic_irq_on(1);
 
     idt_init();
 }

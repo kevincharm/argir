@@ -42,13 +42,6 @@ uint64_t kernel_pd0_pt[512 * 512]
 uint64_t kernel_pd1[512] __attribute__((aligned(PAGE_SIZE)));
 uint64_t kernel_pd1_pt[512 * 512]
     __attribute__((aligned(PAGE_SIZE))); // [1G, 2G); kernel code
-/// -4G
-uint64_t kernel_pd2[512] __attribute__((aligned(PAGE_SIZE)));
-uint64_t kernel_pd2_pt[512 * 512]
-    __attribute__((aligned(PAGE_SIZE))); // [2G, 3G); TODO: still needed?
-uint64_t kernel_pd3[512] __attribute__((aligned(PAGE_SIZE)));
-uint64_t kernel_pd3_pt[512 * 512]
-    __attribute__((aligned(PAGE_SIZE))); // [3G, 4G); TODO: still needed?
 
 uint64_t linear_limit = 0;
 

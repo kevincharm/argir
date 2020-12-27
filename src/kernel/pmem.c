@@ -73,6 +73,7 @@ void pmem_init(struct mb2_info *mb2_info)
              (struct mb2_memory_map_entry *)((unsigned long)mm_entry +
                                              tag->memory_map.entry_size)) {
         if (pmem_blocks_count >= MAX_PMEM_ENTRIES) {
+            // TODO: Panic
             // We're out of early-allocated space!
             break;
         }
