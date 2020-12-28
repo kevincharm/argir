@@ -1,6 +1,10 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+
+void terminal_set_bg_colour(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
+void terminal_set_fg_colour(uint8_t r, uint8_t g, uint8_t b, uint8_t a);
 
 /**
  * Convert a number to a regular ol' ASCII string.
@@ -51,6 +55,81 @@ int printf(const char *restrict fmt, ...)
 
     int len = 0;
     while (*fmt != '\0') {
+        if (*fmt == '\x1b' && *(fmt + 1) == '[') {
+            // ANSI escape
+            fmt += 2;
+            // SGR functions
+            if (*fmt == '0' && *(fmt + 1) == 'm') {
+                // Reset
+                terminal_set_bg_colour(0, 0, 0, 0xff);
+                terminal_set_fg_colour(0xff, 0xff, 0xff, 0xff);
+                fmt += 2;
+                continue;
+            } else if (*fmt == '3' && *(fmt + 2) == 'm') {
+                // Set text to basic colour palette
+                uint8_t colour = *(fmt + 1) - '0';
+                switch (colour) {
+                case 0: // Black
+                    terminal_set_fg_colour(0, 0, 0, 0xff);
+                    break;
+                case 1: // Red
+                    terminal_set_fg_colour(0xff, 0, 0, 0xff);
+                    break;
+                case 2: // Green
+                    terminal_set_fg_colour(0, 0xff, 0, 0xff);
+                    break;
+                case 3: // Yellow
+                    terminal_set_fg_colour(0xff, 0xff, 0, 0xff);
+                    break;
+                case 4: // Blue
+                    terminal_set_fg_colour(0, 0, 0xff, 0xff);
+                    break;
+                case 5: // Magenta
+                    terminal_set_fg_colour(0xff, 0, 0xff, 0xff);
+                    break;
+                case 6: // Cyan
+                    terminal_set_fg_colour(0, 0xff, 0xff, 0xff);
+                    break;
+                case 7: // White
+                    terminal_set_fg_colour(0xff, 0xff, 0xff, 0xff);
+                    break;
+                }
+                fmt += 3;
+                continue;
+            } else if (*fmt == '4' && *(fmt + 2) == 'm') {
+                // Set background to basic colour palette
+                uint8_t colour = *(fmt + 1) - '0';
+                switch (colour) {
+                case 0: // Black
+                    terminal_set_bg_colour(0, 0, 0, 0xff);
+                    break;
+                case 1: // Red
+                    terminal_set_bg_colour(0xff, 0, 0, 0xff);
+                    break;
+                case 2: // Green
+                    terminal_set_bg_colour(0, 0xff, 0, 0xff);
+                    break;
+                case 3: // Yellow
+                    terminal_set_bg_colour(0xff, 0xff, 0, 0xff);
+                    break;
+                case 4: // Blue
+                    terminal_set_bg_colour(0, 0, 0xff, 0xff);
+                    break;
+                case 5: // Magenta
+                    terminal_set_bg_colour(0xff, 0, 0xff, 0xff);
+                    break;
+                case 6: // Cyan
+                    terminal_set_bg_colour(0, 0xff, 0xff, 0xff);
+                    break;
+                case 7: // White
+                    terminal_set_bg_colour(0xff, 0xff, 0xff, 0xff);
+                    break;
+                }
+                fmt += 3;
+                continue;
+            }
+        }
+
         if (*fmt == '%' && *(fmt + 1) == '%') {
             putchar(*((const unsigned char *)fmt));
             fmt += 2;

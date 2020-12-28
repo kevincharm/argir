@@ -24,9 +24,9 @@ struct terminal {
     size_t scale;
     /** Framebuffer */
     uint8_t *fb;
-    size_t fb_width;
-    size_t fb_height;
-    size_t fb_pitch;
+    size_t screen_width; // pixels
+    size_t screen_height; // pixels
+    size_t fb_pitch; // bytes
 };
 
 static struct terminal term0;
@@ -81,13 +81,20 @@ void terminal_scroll_up(size_t n)
         return;
     }
 
-    size_t total = term->fb_pitch * term->fb_height;
-    size_t sub = KFONT_VGA_HEIGHT * n * term->fb_pitch;
-    for (size_t i = sub; i < total; i++) {
-        term->fb[i - sub] = term->fb[i];
+    size_t height_px = term->screen_height;
+    size_t pitch = term->fb_pitch;
+    size_t sub_lines = KFONT_VGA_HEIGHT * term->scale * n;
+    // Move pixels up to top
+    for (size_t j = sub_lines; j < height_px; j++) {
+        for (size_t i = 0; i < pitch; i++) {
+            term->fb[(j - sub_lines) * pitch + i] = term->fb[(j * pitch) + i];
+        }
     }
-    for (size_t i = total - sub; i < total; i++) {
-        term->fb[i] = 0;
+    // Zero-out the new space
+    for (size_t j = height_px - sub_lines; j < height_px; j++) {
+        for (size_t i = 0; i < pitch; i++) {
+            term->fb[(j * pitch) + i] = 0;
+        }
     }
 }
 
@@ -176,8 +183,8 @@ void terminal_init(uint64_t *framebuffer, size_t screen_width,
     term->width = screen_width / (GLYPH_WIDTH * term->scale);
     term->height = screen_height / (KFONT_VGA_HEIGHT * term->scale);
     term->fb = framebuffer;
-    term->fb_width = screen_width;
-    term->fb_height = screen_height;
+    term->screen_width = screen_width;
+    term->screen_height = screen_height;
     term->fb_pitch = fb_scanline;
     terminal_clear();
 }

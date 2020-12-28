@@ -1,9 +1,10 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <string.h>
-#include <kernel/cpu.h>
-#include <kernel/interrupts.h>
-#include <kernel/pic.h>
+#include "kernel/cpu.h"
+#include "kernel/interrupts.h"
+#include "kernel/pic.h"
+#include "kernel/colours.h"
 
 #define IDT_DEFAULT_ISR_HANDLER(n)                                             \
     extern void isr##n(void);                                                  \
@@ -21,21 +22,24 @@ void isr_handler(struct interrupt_frame *frame)
 {
     switch (frame->int_no) {
     case 0: // #DE
-        printf("Fault occurred: Divide-by-zero\n");
+        printf(BG_BIANCO(FG_ROSSO(" FAULT ")) " Divide-by-zero\n");
         break;
     case 6: // #UD (Invalid Opcode)
-        printf("Fault occurred: Invalid opcode\n");
+        printf(BG_BIANCO(FG_ROSSO(" FAULT ")) " Invalid opcode\n");
         break;
     case 8: // #DF (Double Fault)
-        printf("Fault occurred: Double fault (0x%x)", frame->err_code);
+        printf(BG_BIANCO(FG_ROSSO(" FAULT ")) " Double fault (0x%x)",
+               frame->err_code);
         __asm__ volatile("1: jmp 1b");
         break;
     case 13: // #GP (General Protection Fault)
-        printf("Fault occurred: General protection fault (0x%x)\n",
-               frame->err_code);
+        printf(
+            BG_BIANCO(FG_ROSSO(" FAULT ")) " General protection fault (0x%x)\n",
+            frame->err_code);
         break;
     case 14: // #PF (Page Fault)
-        printf("Fault occurred: Page fault (0x%x)\n", frame->err_code);
+        printf(BG_BIANCO(FG_ROSSO(" FAULT ")) " Page fault (0x%x)\n",
+               frame->err_code);
         break;
     case 33: // 0x21
         keyboard_irq_handler();
