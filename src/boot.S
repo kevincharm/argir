@@ -4,8 +4,8 @@
 #   Multiboot2 Header                                                         #
 #   Spec: https://www.gnu.org/software/grub/manual/multiboot2/multiboot.html  #
 ###############################################################################
-.set SCREEN_WIDTH, (800)
-.set SCREEN_HEIGHT, (600)
+.set SCREEN_WIDTH, (1280)
+.set SCREEN_HEIGHT, (720)
 .set FLAGS, (0)
 .set MAGIC, (0xe85250d6)
 .set CHECKSUM, -(MAGIC + FLAGS + (mb2_header_end - mb2_header_start))

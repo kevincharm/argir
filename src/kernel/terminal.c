@@ -7,12 +7,21 @@ extern uint64_t KFONT_VGA_HEIGHT;
 extern uint8_t KFONT_VGA[];
 #define GLYPH_WIDTH (KFONT_VGA_LEN / KFONT_VGA_WIDTH)
 
+struct colour {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+    uint8_t a;
+};
+
 struct terminal {
     size_t row;
     size_t col;
     size_t width;
     size_t height;
-    uint8_t colour;
+    struct colour fg_colour;
+    struct colour bg_colour;
+    size_t scale;
     /** Framebuffer */
     uint8_t *fb;
     size_t fb_width;
@@ -23,36 +32,44 @@ struct terminal {
 static struct terminal term0;
 static struct terminal *term = &term0;
 
-static inline uint8_t vga_colour_calc(uint8_t fg, uint8_t bg)
-{
-    return fg | (bg << 4u);
-}
-
-static inline void terminal_vga_colour_set(uint8_t fg, uint8_t bg)
-{
-    term->colour = vga_colour_calc(fg, bg);
-}
-
 static inline void vga_text_set(size_t x, size_t y, unsigned char c)
 {
     if (term->fb == NULL) {
         return;
     }
 
-    // term->buffer[i] = ((uint16_t)(term->colour) << 8u) | c;
     // Find the glyph offset in the font bitmap
     size_t glyph_x_off = (c - 0x20) * GLYPH_WIDTH;
     // Copy pixels from glyph to framebuffer
-    for (size_t j = 0; j < KFONT_VGA_HEIGHT; j++) {
-        for (size_t i = 0; i < GLYPH_WIDTH; i++) {
-            size_t index = KFONT_VGA_WIDTH * j + glyph_x_off + i;
-            uint32_t argb = ((KFONT_VGA[index] << 16) & 0xff0000) |
-                            ((KFONT_VGA[index + 1] << 8) & 0xff00) |
-                            KFONT_VGA[index + 2];
+    for (size_t j = 0; j < KFONT_VGA_HEIGHT * term->scale; j++) {
+        for (size_t i = 0; i < GLYPH_WIDTH * term->scale; i++) {
+            size_t index = (KFONT_VGA_WIDTH * (j / term->scale) + glyph_x_off +
+                            (i / term->scale));
+            index -= 1; // idk, font file issue?
+
+            uint8_t red, green, blue, alpha;
+            bool is_fg =
+                KFONT_VGA[index] + KFONT_VGA[index + 1] + KFONT_VGA[index + 2] >
+                0;
+            if (is_fg) {
+                red = KFONT_VGA[index] * term->fg_colour.r / 0xff;
+                green = KFONT_VGA[index + 1] * term->fg_colour.g / 0xff;
+                blue = KFONT_VGA[index + 2] * term->fg_colour.b / 0xff;
+                alpha = term->fg_colour.a;
+            } else {
+                red = term->bg_colour.r;
+                green = term->bg_colour.g;
+                blue = term->bg_colour.b;
+                alpha = term->bg_colour.a;
+            }
+            uint32_t argb = ((alpha << 24) | 0xff000000) |
+                            ((red << 16) & 0xff0000) | ((green << 8) & 0xff00) |
+                            blue;
 
             // Calculate framebuffer offset, i.e. where to copy pixels to
-            size_t fb_off = term->fb_pitch * (KFONT_VGA_HEIGHT * y + j) +
-                            (GLYPH_WIDTH * x + i) * 4;
+            size_t fb_off =
+                term->fb_pitch * (KFONT_VGA_HEIGHT * term->scale * y + j) +
+                (GLYPH_WIDTH * term->scale * x + i) * 4;
             *((uint32_t *)(term->fb + fb_off)) = argb;
         }
     }
@@ -72,6 +89,22 @@ void terminal_scroll_up(size_t n)
     for (size_t i = total - sub; i < total; i++) {
         term->fb[i] = 0;
     }
+}
+
+void terminal_set_fg_colour(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+    term->fg_colour.r = r;
+    term->fg_colour.g = g;
+    term->fg_colour.b = b;
+    term->fg_colour.a = a;
+}
+
+void terminal_set_bg_colour(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+    term->bg_colour.r = r;
+    term->bg_colour.g = g;
+    term->bg_colour.b = b;
+    term->bg_colour.a = a;
 }
 
 void terminal_write_char(const char c)
@@ -127,12 +160,21 @@ void terminal_write(const char *str)
 }
 
 void terminal_init(uint64_t *framebuffer, size_t screen_width,
-                   size_t screen_height, size_t fb_scanline)
+                   size_t screen_height, size_t fb_scanline, size_t scale)
 {
     term->row = 0;
     term->col = 0;
-    term->width = screen_width / GLYPH_WIDTH;
-    term->height = screen_height / KFONT_VGA_HEIGHT;
+    term->scale = 2;
+    term->fg_colour.r = 0xff;
+    term->fg_colour.g = 0xff;
+    term->fg_colour.b = 0xff;
+    term->fg_colour.a = 0xff;
+    term->bg_colour.r = 0;
+    term->bg_colour.g = 0;
+    term->bg_colour.b = 0;
+    term->bg_colour.a = 0;
+    term->width = screen_width / (GLYPH_WIDTH * term->scale);
+    term->height = screen_height / (KFONT_VGA_HEIGHT * term->scale);
     term->fb = framebuffer;
     term->fb_width = screen_width;
     term->fb_height = screen_height;

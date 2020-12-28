@@ -33,7 +33,7 @@ void kernel_main(void)
     // Calculate higher-half MB2 boot info address
     uint64_t mb2_info_vma = (uint64_t)mb2_info + KERNEL_VMA;
 
-    terminal_init(NULL, 800, 600, 3200); // Dummy null output for printfs
+    terminal_init(NULL, 800, 600, 3200, 1); // Dummy null output for printfs
     pmem_init(mb2_info_vma);
     print_build_info();
 

@@ -232,7 +232,7 @@ void paging_init(struct mb2_info *mb2_info)
     size_t width = tag_fb->framebuffer.width;
     size_t height = tag_fb->framebuffer.height;
     size_t pitch = tag_fb->framebuffer.pitch;
-    terminal_init(LFB_VMA, width, height, pitch);
+    terminal_init(LFB_VMA, width, height, pitch, 2);
 
     /// Map the available RAM to a linear address space
     printf("Mapping linear address space...\n");
