@@ -126,8 +126,12 @@ void keyboard_irq_handler()
         goto input_finished;
     }
 
-    if ((key >= 0x20 && key <= 0x7f) || key == KB_BACKSPACE ||
-        key == KB_ENTER) {
+    if (key == KB_ENTER && !break_next) {
+        u8_rb_fifo_push(kbuf, '\n');
+        goto input_finished;
+    }
+
+    if ((key >= 0x20 && key <= 0x7f) || key == KB_BACKSPACE) {
         // Printable ASCII
         if (caps_lock && key >= 0x61 && key <= 0x7a) {
             // Transform lowercase->uppercase

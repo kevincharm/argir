@@ -19,8 +19,27 @@ extern void keyboard_irq_handler(void);
  */
 void isr_handler(struct interrupt_frame *frame)
 {
-    if (frame->int_no == 0x21) {
+    switch (frame->int_no) {
+    case 0: // #DE
+        printf("Fault occurred: Divide-by-zero\n");
+        break;
+    case 6: // #UD (Invalid Opcode)
+        printf("Fault occurred: Invalid opcode\n");
+        break;
+    case 8: // #DF (Double Fault)
+        printf("Fault occurred: Double fault (0x%x)", frame->err_code);
+        __asm__ volatile("1: jmp 1b");
+        break;
+    case 13: // #GP (General Protection Fault)
+        printf("Fault occurred: General protection fault (0x%x)\n",
+               frame->err_code);
+        break;
+    case 14: // #PF (Page Fault)
+        printf("Fault occurred: Page fault (0x%x)\n", frame->err_code);
+        break;
+    case 33: // 0x21
         keyboard_irq_handler();
+        break;
     }
 
     // Send an EOI iff (!!) this ISR was triggered by an IRQ
