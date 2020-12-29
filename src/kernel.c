@@ -35,6 +35,8 @@ void kernel_main(void)
 
     terminal_init(NULL, 800, 600, 3200, 1); // Dummy null output for printfs
     pmem_init(mb2_info_vma);
+    paging_init(mb2_info_vma);
+    vmem_init();
     print_build_info();
 
     gdt_init();

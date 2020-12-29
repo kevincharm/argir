@@ -161,7 +161,4 @@ void pmem_init(struct mb2_info *mb2_info)
     }
     printf("Total physical memory entries mapped: %u (%u GiB)\n\n",
            pmem_blocks_count, total_block_size / (1 << 30));
-
-    // We now have some memory to allocate for our page tables
-    paging_init(mb2_info);
 }

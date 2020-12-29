@@ -215,7 +215,10 @@ static void paging_remap_kernel()
 
 /**
  * Setup paging:
- * mb2_info will NOT be available after this subroutine returns.
+ *  - Remap kernel to 4K pages
+ *  - Remap LFB to higher-half
+ *  - Re-initialise terminal with new LFB
+ *  - Map bottom-half linear address space to available physical space from memory map
  */
 void paging_init(struct mb2_info *mb2_info)
 {
