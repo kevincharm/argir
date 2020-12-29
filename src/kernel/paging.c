@@ -101,8 +101,7 @@ static void paging_map_page(uint64_t virtaddr, uint64_t physaddr)
             (uint64_t)pdpt | PTE_PRESENT | PTE_READWRITE;
         // Map the pdpt to a virt addr so we can access it
         uint64_t *v_pdpt = paging_temp_map(pdpt);
-        for (size_t e = 0; e < 512; e++)
-            v_pdpt[e] = 0;
+        memset(v_pdpt, 0, 512 * (sizeof *v_pdpt));
     }
     pdpt = paging_temp_map(kernel_pml4[PML4_INDEX(virtaddr)]);
     if (!(pdpt[PDPT_INDEX(virtaddr)] & PTE_PRESENT)) {
@@ -112,8 +111,7 @@ static void paging_map_page(uint64_t virtaddr, uint64_t physaddr)
         pdpt[PDPT_INDEX(virtaddr)] = (uint64_t)pd | PTE_PRESENT | PTE_READWRITE;
         // Map the pd to a virt addr so we can access it
         uint64_t *v_pd = paging_temp_map(pd);
-        for (size_t e = 0; e < 512; e++)
-            v_pd[e] = 0;
+        memset(v_pd, 0, 512 * (sizeof *v_pd));
         // Remap the PDPT as we will need to access it again
         pdpt = paging_temp_map(kernel_pml4[PML4_INDEX(virtaddr)]);
     }
@@ -131,8 +129,7 @@ static void paging_map_page(uint64_t virtaddr, uint64_t physaddr)
         pd[PD_INDEX(virtaddr)] = (uint64_t)pt | PTE_PRESENT | PTE_READWRITE;
         // Map the pd to a virt addr so we can access it
         uint64_t *v_pt = paging_temp_map(pt);
-        for (size_t e = 0; e < 512; e++)
-            v_pt[e] = 0;
+        memset(v_pt, 0, 512 * (sizeof *v_pt));
         // Remap the PD as we will need to access it again
         // This is a bit convoluted: PDPT is no longer available,
         // so we have to consecutively map it from a known mapped address (PML4).
@@ -140,7 +137,6 @@ static void paging_map_page(uint64_t virtaddr, uint64_t physaddr)
         pd = paging_temp_map(pdpt[PDPT_INDEX(virtaddr)]);
     }
     pt = paging_temp_map(pd[PD_INDEX(virtaddr)]);
-    // printf("PT addr: %x ... idx: %u\n", pt, PT_INDEX(virtaddr));
     pt[PT_INDEX(virtaddr)] = physaddr | PTE_PRESENT | PTE_READWRITE;
 }
 
