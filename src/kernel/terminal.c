@@ -1,5 +1,5 @@
 #include <string.h>
-#include <kernel/terminal.h>
+#include "kernel/terminal.h"
 
 extern uint64_t KFONT_VGA_LEN;
 extern uint64_t KFONT_VGA_WIDTH;
@@ -23,7 +23,7 @@ struct terminal {
     struct colour bg_colour;
     size_t scale;
     /** Framebuffer */
-    uint8_t *fb;
+    volatile uint8_t *fb;
     size_t screen_width; // pixels
     size_t screen_height; // pixels
     size_t fb_pitch; // bytes
@@ -34,9 +34,8 @@ static struct terminal *term = &term0;
 
 static inline void vga_text_set(size_t x, size_t y, unsigned char c)
 {
-    if (term->fb == NULL) {
+    if (term->fb == NULL)
         return;
-    }
 
     // Find the glyph offset in the font bitmap
     size_t glyph_x_off = (c - 0x20) * GLYPH_WIDTH;
@@ -70,31 +69,26 @@ static inline void vga_text_set(size_t x, size_t y, unsigned char c)
             size_t fb_off =
                 term->fb_pitch * (KFONT_VGA_HEIGHT * term->scale * y + j) +
                 (GLYPH_WIDTH * term->scale * x + i) * 4;
-            *((uint32_t *)(term->fb + fb_off)) = argb;
+            *((uint32_t *)((uint8_t *)term->fb + fb_off)) = argb;
         }
     }
 }
 
 void terminal_scroll_up(size_t n)
 {
-    if (term->fb == NULL) {
+    if (term->fb == NULL)
         return;
-    }
 
     size_t height_px = term->screen_height;
     size_t pitch = term->fb_pitch;
-    size_t sub_lines = KFONT_VGA_HEIGHT * term->scale * n;
-    // Move pixels up to top
-    for (size_t j = sub_lines; j < height_px; j++) {
-        for (size_t i = 0; i < pitch; i++) {
-            term->fb[(j - sub_lines) * pitch + i] = term->fb[(j * pitch) + i];
-        }
+    size_t cut = KFONT_VGA_HEIGHT * term->scale * n;
+    for (size_t j = 0; j < height_px - cut; j++) {
+        size_t j_2 = j + cut;
+        memcpy(term->fb + (j * pitch), term->fb + (j_2 * pitch), pitch);
     }
-    // Zero-out the new space
-    for (size_t j = height_px - sub_lines; j < height_px; j++) {
-        for (size_t i = 0; i < pitch; i++) {
-            term->fb[(j * pitch) + i] = 0;
-        }
+    for (size_t j = height_px - cut; j < height_px; j++) {
+        size_t j_2 = j + cut;
+        memset(term->fb + (j * pitch), 0, pitch);
     }
 }
 
